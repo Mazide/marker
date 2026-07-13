@@ -4,3 +4,4 @@ assets/AppIcon.iconset/
 .DS_Store
 *.xcodeproj
 .swiftpm/
+.wrangler/
