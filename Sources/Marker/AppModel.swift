@@ -55,7 +55,6 @@ final class AppModel {
     // Domain layer
     @ObservationIgnored private var engine: CaptureEngine!
     @ObservationIgnored private var pasteEngine: PasteEngine!
-    @ObservationIgnored private var pasteQueue = PasteQueue()
 
     init() {
         engine = CaptureEngine(
@@ -89,20 +88,8 @@ final class AppModel {
             self?.ingest(text: text, app: app)
         }
         hotkey.onHotkey = { [weak self] in
-            guard let self else { return }
-            // A recent burst of selections pastes in order (⌥V ⌥V ⌥V fills
-            // three form fields); otherwise ⌥V pastes the latest.
-            if let next = self.pasteQueue.nextForPaste(at: Date()) {
-                self.pasteEngine.pasteIntoActiveApp(next.text)
-                if next.total > 1, self.toastEnabled {
-                    ToastPresenter.shared.show(
-                        text: next.text,
-                        caption: .pasted(index: next.index, total: next.total)
-                    )
-                }
-            } else if let item = self.history.items.first {
-                self.pasteEngine.pasteIntoActiveApp(item.text)
-            }
+            guard let self, let item = self.history.items.first else { return }
+            self.pasteEngine.pasteIntoActiveApp(item.text)
         }
         hotkey.register()
 
@@ -142,7 +129,6 @@ final class AppModel {
     private func ingest(text: String, app: SourceApp) {
         let isNew = history.items.first?.text != text
         history.push(text: text, app: app)
-        pasteQueue.captured(text, at: Date())
         if copyToClipboardEnabled {
             pasteboard.writeString(text)
         }
