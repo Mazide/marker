@@ -35,6 +35,14 @@ private struct GeneralSettingsView: View {
                 Toggle("Show a popup on capture", isOn: Bindable(model).toastEnabled)
                 Toggle("Start at login", isOn: Bindable(model).launchAtLogin)
             }
+            Section("History") {
+                LabeledContent("Remove all captured selections") {
+                    Button("Clear History…", role: .destructive) {
+                        model.history.clear()
+                    }
+                    .disabled(model.history.items.isEmpty)
+                }
+            }
         }
         .formStyle(.grouped)
         .padding(.bottom, 4)
@@ -49,37 +57,52 @@ private struct AboutView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
-                .frame(width: 72, height: 72)
+                .frame(width: 84, height: 84)
+                .shadow(color: .black.opacity(0.25), radius: 9, y: 4)
+                .padding(.bottom, 10)
             Text("Marker")
                 .font(.title2.weight(.semibold))
-            Text("Select text. It's already copied.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
             Text(version)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .padding(.top, 2)
+            Text("Select text. It's already copied.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(.top, 8)
 
-            HStack(spacing: 14) {
+            Divider()
+                .frame(width: 220)
+                .padding(.vertical, 14)
+
+            HStack(spacing: 18) {
                 Link("Website", destination: URL(string: "https://getmarkerapp.net")!)
                 Link("GitHub", destination: URL(string: "https://github.com/Mazide/marker")!)
                 Link("Privacy", destination: URL(string: "https://getmarkerapp.net/privacy/")!)
             }
             .font(.callout)
 
-            Button("Check for Updates…") {
-                AppModel.shared.checkForUpdates()
+            HStack(spacing: 10) {
+                Button("Check for Updates…") {
+                    AppModel.shared.checkForUpdates()
+                }
+                Button("Quit Marker") {
+                    NSApp.terminate(nil)
+                }
             }
-            .padding(.top, 2)
+            .padding(.top, 12)
 
             Text("MIT-licensed. No analytics, no telemetry.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+                .padding(.top, 14)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.top, 26)
+        .padding(.bottom, 20)
     }
 }
 

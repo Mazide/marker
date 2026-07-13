@@ -185,24 +185,16 @@ struct HistoryView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
-            Menu {
-                Button("Settings…") { openSettings() }
-                    .keyboardShortcut(",")
-                Divider()
-                Button("Clear History…") { model.history.clear() }
-                    .disabled(model.history.items.isEmpty)
-                Divider()
-                Button("Check for Updates…") { model.checkForUpdates() }
-                Button("Quit Marker") { NSApp.terminate(nil) }
-                    .keyboardShortcut("q")
+            Button {
+                openSettings()
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
+            .buttonStyle(.plain)
+            .keyboardShortcut(",")
+            .help("Settings")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
@@ -222,11 +214,16 @@ private struct HistoryRow: View {
                     .resizable()
                     .frame(width: 20, height: 20)
                     .padding(.top, 1)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
+                    // The snippet sits on a chip so it reads as a copied
+                    // fragment, not as UI text.
                     Text(item.text.trimmingCharacters(in: .whitespacesAndNewlines))
                         .font(.callout)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
                     HStack(spacing: 4) {
                         Text(item.appName)
                         Text("·")
@@ -234,6 +231,7 @@ private struct HistoryRow: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .padding(.leading, 1)
                 }
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 11))
@@ -247,8 +245,8 @@ private struct HistoryRow: View {
         }
         .buttonStyle(.plain)
         .background(
-            isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: 6)
+            isHovered ? AnyShapeStyle(Color.primary.opacity(0.07)) : AnyShapeStyle(.clear),
+            in: RoundedRectangle(cornerRadius: 8)
         )
         .padding(.horizontal, 6)
         .onHover { isHovered = $0 }
