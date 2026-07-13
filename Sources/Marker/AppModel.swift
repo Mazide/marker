@@ -43,6 +43,15 @@ final class AppModel {
         didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
     }
 
+    /// Trackpad three-finger tap as a middle-click substitute (private
+    /// MultitouchSupport API — experimental, off by default).
+    var threeFingerTapEnabled: Bool = UserDefaults.standard.object(forKey: "threeFingerTapEnabled") as? Bool ?? false {
+        didSet {
+            UserDefaults.standard.set(threeFingerTapEnabled, forKey: "threeFingerTapEnabled")
+            if threeFingerTapEnabled { trackpadTap.start() }
+        }
+    }
+
     // System layer
     @ObservationIgnored private let pasteboard = SystemPasteboard()
     @ObservationIgnored private let keys = CGEventKeySynthesizer()
@@ -51,6 +60,7 @@ final class AppModel {
     @ObservationIgnored private let axMonitor = AXSelectionMonitor()
     @ObservationIgnored private let mouseMonitor = MouseMonitor()
     @ObservationIgnored private let middleClickTap = MiddleClickTap()
+    @ObservationIgnored private let trackpadTap = TrackpadTapMonitor()
     @ObservationIgnored private let hotkey = HotkeyManager()
     @ObservationIgnored private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -107,6 +117,16 @@ final class AppModel {
             // Paste into the current focus, same as ⌥V.
             self.pasteEngine.pasteIntoActiveApp(text)
             return true
+        }
+        trackpadTap.onThreeFingerTap = { [weak self] in
+            guard let self, self.threeFingerTapEnabled, self.axTrusted,
+                  MiddlePastePolicy.shouldPaste(role: self.axMonitor.roleAtMouseLocation()),
+                  let text = self.history.items.first?.text
+            else { return }
+            self.pasteEngine.pasteIntoActiveApp(text)
+        }
+        if threeFingerTapEnabled {
+            trackpadTap.start()
         }
         hotkey.register()
 

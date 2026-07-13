@@ -184,7 +184,9 @@ struct HistoryView: View {
                 Toggle("Show Popup", isOn: Bindable(model).toastEnabled)
                 Toggle("Start at Login", isOn: Bindable(model).launchAtLogin)
                 Toggle("Middle-Click Paste", isOn: Bindable(model).middleClickPasteEnabled)
-                    .help("X11-style: middle-click in a text field pastes the latest selection at the click point. Clicks outside text fields pass through.")
+                    .help("X11-style: middle-click in a text field pastes the latest selection. Clicks outside text fields pass through.")
+                Toggle("Three-Finger Tap Paste", isOn: Bindable(model).threeFingerTapEnabled)
+                    .help("Experimental: a quick three-finger trackpad tap over a text field pastes the latest selection.")
                 Divider()
                 Button("Clear History…") { model.history.clear() }
                     .disabled(model.history.items.isEmpty)
