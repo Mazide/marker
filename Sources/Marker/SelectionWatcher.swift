@@ -135,6 +135,34 @@ final class SelectionWatcher: NSObject {
         onSelection?(text, watchedApp)
     }
 
+    /// Immediate AX read, used by the mouse-up path (no notification needed).
+    func currentAXSelection() -> String? {
+        guard let focused = focusedElement() else { return nil }
+        return selectedText(of: focused)
+    }
+
+    /// AX role of the element under the mouse cursor, to skip fallback
+    /// copies on scrollbars, buttons, etc. AX coordinates are top-left
+    /// origin, NSEvent.mouseLocation is bottom-left.
+    func roleAtMouseLocation() -> String? {
+        let location = NSEvent.mouseLocation
+        guard let screenHeight = NSScreen.screens.first?.frame.height else { return nil }
+        var elementRef: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(
+            systemWide,
+            Float(location.x),
+            Float(screenHeight - location.y),
+            &elementRef
+        ) == .success, let elementRef else { return nil }
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            elementRef,
+            kAXRoleAttribute as CFString,
+            &roleRef
+        ) == .success else { return nil }
+        return roleRef as? String
+    }
+
     private func selectedText(of element: AXUIElement) -> String? {
         var textRef: CFTypeRef?
         let err = AXUIElementCopyAttributeValue(

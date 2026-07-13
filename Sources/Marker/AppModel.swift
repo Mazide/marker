@@ -10,13 +10,35 @@ final class AppModel {
     let history = HistoryStore()
     var axTrusted = AXIsProcessTrusted()
 
+    var fallbackCopyEnabled: Bool = UserDefaults.standard.object(forKey: "fallbackCopyEnabled") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(fallbackCopyEnabled, forKey: "fallbackCopyEnabled") }
+    }
+
+    var toastEnabled: Bool = UserDefaults.standard.object(forKey: "toastEnabled") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
+    }
+
     @ObservationIgnored private let watcher = SelectionWatcher()
     @ObservationIgnored private let hotkey = HotkeyManager()
+    @ObservationIgnored private let mouseMonitor = MouseMonitor()
     @ObservationIgnored private var trustPollTimer: Timer?
+    /// Apps that have proven they report selections via AX; for these an
+    /// empty AX read means "nothing selected", so never fall back to Cmd+C
+    /// (which could copy a whole line in editors like VS Code).
+    @ObservationIgnored private var axProvenApps: Set<String> = []
+    /// Element roles where a drag is not a text selection.
+    private static let nonTextRoles: Set<String> = [
+        "AXScrollBar", "AXSlider", "AXButton", "AXMenuItem", "AXMenu",
+        "AXMenuBar", "AXMenuBarItem", "AXPopUpButton", "AXCheckBox",
+        "AXRadioButton", "AXToolbar", "AXTabGroup", "AXDisclosureTriangle",
+    ]
 
     func start() {
         watcher.onSelection = { [weak self] text, app in
-            self?.history.push(text: text, app: app)
+            self?.ingest(text: text, app: app, viaAX: true)
+        }
+        mouseMonitor.onSelectionGesture = { [weak self] downChangeCount in
+            self?.handleSelectionGesture(downChangeCount: downChangeCount)
         }
         hotkey.onHotkey = { [weak self] in
             guard let item = self?.history.items.first else { return }
@@ -28,8 +50,62 @@ final class AppModel {
         promptForAccessibilityIfNeeded()
         if axTrusted {
             watcher.start()
+            mouseMonitor.start()
         } else {
             pollForTrust()
+        }
+    }
+
+    private func ingest(text: String, app: NSRunningApplication, viaAX: Bool) {
+        if viaAX, let bundleID = app.bundleIdentifier {
+            axProvenApps.insert(bundleID)
+        }
+        let isNew = history.items.first?.text != text
+        history.push(text: text, app: app)
+        if isNew, toastEnabled {
+            ToastPresenter.shared.show(text: text)
+        }
+    }
+
+    private func handleSelectionGesture(downChangeCount: Int) {
+        guard axTrusted else { return }
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        else { return }
+
+        // Give the app a beat to finalize the selection after mouse-up.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self else { return }
+            if let text = self.watcher.currentAXSelection(),
+               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                self.ingest(text: text, app: app, viaAX: true)
+                return
+            }
+            guard self.fallbackCopyEnabled,
+                  self.axProvenApps.contains(app.bundleIdentifier ?? "") == false
+            else { return }
+            // The app copy-on-selected by itself (terminals, TUIs): the
+            // selection is already on the clipboard — just take it.
+            if NSPasteboard.general.changeCount != downChangeCount {
+                if let text = NSPasteboard.general.string(forType: .string),
+                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    markerLog.info("app self-copied \(text.count) chars")
+                    self.ingest(text: text, app: app, viaAX: false)
+                }
+                return
+            }
+            if let role = self.watcher.roleAtMouseLocation(),
+               Self.nonTextRoles.contains(role) {
+                return
+            }
+            markerLog.debug("fallback Cmd+C for \(app.localizedName ?? "?", privacy: .public)")
+            FallbackCopier.capture { text in
+                guard let text,
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else { return }
+                markerLog.info("fallback captured \(text.count) chars")
+                self.ingest(text: text, app: app, viaAX: false)
+            }
         }
     }
 
@@ -54,6 +130,7 @@ final class AppModel {
                 markerLog.info("AX trust granted, starting watcher")
                 self.axTrusted = true
                 self.watcher.start()
+                self.mouseMonitor.start()
             }
         }
     }

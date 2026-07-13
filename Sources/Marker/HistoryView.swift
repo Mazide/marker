@@ -63,18 +63,28 @@ struct HistoryView: View {
     }
 
     private var footer: some View {
-        HStack {
-            Button("Clear") {
-                model.history.clear()
+        VStack(spacing: 6) {
+            HStack(spacing: 12) {
+                Toggle("Fallback ⌘C", isOn: Bindable(model).fallbackCopyEnabled)
+                    .help("In apps that hide selections from Accessibility (Telegram, kitty), synthesize Cmd+C on mouse-up and restore the clipboard afterwards.")
+                Toggle("Popup", isOn: Bindable(model).toastEnabled)
+                Spacer()
             }
-            .disabled(model.history.items.isEmpty)
-            Spacer()
-            Button("Quit") {
-                NSApp.terminate(nil)
+            .toggleStyle(.checkbox)
+            .font(.caption)
+            HStack {
+                Button("Clear") {
+                    model.history.clear()
+                }
+                .disabled(model.history.items.isEmpty)
+                Spacer()
+                Button("Quit") {
+                    NSApp.terminate(nil)
+                }
             }
+            .buttonStyle(.borderless)
+            .font(.callout)
         }
-        .buttonStyle(.borderless)
-        .font(.callout)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
