@@ -183,6 +183,8 @@ struct HistoryView: View {
                     .help("Place every captured selection on the system clipboard. Off: selections stay in Marker only.")
                 Toggle("Show Popup", isOn: Bindable(model).toastEnabled)
                 Toggle("Start at Login", isOn: Bindable(model).launchAtLogin)
+                Toggle("Middle-Click Paste", isOn: Bindable(model).middleClickPasteEnabled)
+                    .help("X11-style: middle-click in a text field pastes the latest selection at the click point. Clicks outside text fields pass through.")
                 Divider()
                 Button("Clear History…") { model.history.clear() }
                     .disabled(model.history.items.isEmpty)

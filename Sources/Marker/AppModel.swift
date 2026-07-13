@@ -37,6 +37,12 @@ final class AppModel {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
     }
 
+    /// X11-style middle-click paste at the click point. Off by default;
+    /// only swallows clicks over editable text (MiddlePastePolicy).
+    var middleClickPasteEnabled: Bool = UserDefaults.standard.object(forKey: "middleClickPasteEnabled") as? Bool ?? false {
+        didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
+    }
+
     // System layer
     @ObservationIgnored private let pasteboard = SystemPasteboard()
     @ObservationIgnored private let keys = CGEventKeySynthesizer()
@@ -44,6 +50,7 @@ final class AppModel {
     @ObservationIgnored private let frontmost = WorkspaceFrontmost()
     @ObservationIgnored private let axMonitor = AXSelectionMonitor()
     @ObservationIgnored private let mouseMonitor = MouseMonitor()
+    @ObservationIgnored private let middleClickTap = MiddleClickTap()
     @ObservationIgnored private let hotkey = HotkeyManager()
     @ObservationIgnored private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -91,6 +98,16 @@ final class AppModel {
             guard let self, let item = self.history.items.first else { return }
             self.pasteEngine.pasteIntoActiveApp(item.text)
         }
+        middleClickTap.onMiddleClick = { [weak self] point in
+            guard let self, self.middleClickPasteEnabled, self.axTrusted,
+                  MiddlePastePolicy.shouldPaste(role: self.axMonitor.roleAtMouseLocation()),
+                  let text = self.history.items.first?.text
+            else { return false }
+            _ = point
+            // Paste into the current focus, same as ⌥V.
+            self.pasteEngine.pasteIntoActiveApp(text)
+            return true
+        }
         hotkey.register()
 
         // First run from /Applications: start at login by default (the
@@ -108,6 +125,7 @@ final class AppModel {
         if axTrusted {
             axMonitor.start()
             mouseMonitor.start()
+            middleClickTap.start()
         } else {
             pollForTrust()
         }
@@ -154,6 +172,7 @@ final class AppModel {
                 self.axTrusted = true
                 self.axMonitor.start()
                 self.mouseMonitor.start()
+                self.middleClickTap.start()
             }
         }
     }
