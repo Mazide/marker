@@ -9,83 +9,75 @@ struct HistoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
             content
             Divider()
             footer
         }
         .frame(width: 360)
+        .tint(Color(red: 0.91, green: 0.46, blue: 0.05))
     }
 
-    // MARK: - Header
+    // MARK: - Header (search + filter is the header)
 
     private var header: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("Marker")
-                    .font(.headline)
-                Spacer()
-                Text("⌥V pastes latest")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            HStack(spacing: 8) {
-                searchField
-                appFilter
-            }
+        HStack(spacing: 8) {
+            searchField
+            appFilter
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     private var searchField: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
-                .font(.callout)
+                .font(.body)
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary.opacity(0.6)))
+        .padding(.horizontal, 8)
+        .frame(height: 28)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var appFilter: some View {
         Menu {
-            Button("All apps") { filterBundleID = nil }
-            Divider()
-            ForEach(model.history.apps, id: \.bundleID) { app in
-                Button {
-                    filterBundleID = app.bundleID
-                } label: {
+            Picker("Filter", selection: $filterBundleID) {
+                Text("All Apps").tag(String?.none)
+                Divider()
+                ForEach(model.history.apps, id: \.bundleID) { app in
                     Label {
                         Text(app.name)
                     } icon: {
                         Image(nsImage: AppIcons.icon(for: app.bundleID))
                     }
+                    .tag(String?.some(app.bundleID))
                 }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
         } label: {
-            if let filterBundleID {
-                Image(nsImage: AppIcons.icon(for: filterBundleID))
-            } else {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .foregroundStyle(.secondary)
-            }
+            Image(systemName: filterBundleID == nil
+                  ? "line.3.horizontal.decrease.circle"
+                  : "line.3.horizontal.decrease.circle.fill")
+                .font(.system(size: 15))
+                .foregroundStyle(filterBundleID == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
         .help("Filter by app")
     }
@@ -118,43 +110,46 @@ struct HistoryView: View {
     @ViewBuilder
     private var content: some View {
         if !model.axTrusted {
-            VStack(spacing: 8) {
+            ContentUnavailableView {
+                Label("Accessibility Access Needed", systemImage: "hand.raised")
+            } description: {
                 Text("Marker needs Accessibility access to see text selections.")
-                    .font(.callout)
-                    .multilineTextAlignment(.center)
+            } actions: {
                 Button("Open System Settings") {
                     model.openAccessibilitySettings()
                 }
+                .buttonStyle(.borderedProminent)
             }
-            .frame(maxWidth: .infinity)
-            .padding(16)
+            .frame(minHeight: 180)
         } else if model.history.items.isEmpty {
-            Text("Select text in any app — it lands here.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(16)
+            ContentUnavailableView(
+                "No Selections Yet",
+                systemImage: "character.cursor.ibeam",
+                description: Text("Select text in any app. It lands here.")
+            )
+            .frame(minHeight: 160)
         } else if filteredItems.isEmpty {
-            Text("Nothing matches.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(16)
+            ContentUnavailableView.search(text: searchText)
+                .frame(minHeight: 160)
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     ForEach(dayGroups, id: \.day) { group in
-                        Text(dayTitle(group.day))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.top, 10)
-                            .padding(.bottom, 4)
-                        ForEach(group.items) { item in
-                            HistoryRow(item: item) {
-                                Paster.copyToClipboard(item.text)
-                                dismiss()
+                        Section {
+                            ForEach(group.items) { item in
+                                HistoryRow(item: item) {
+                                    Paster.copyToClipboard(item.text)
+                                    dismiss()
+                                }
                             }
+                        } header: {
+                            Text(dayTitle(group.day))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(.regularMaterial)
                         }
                     }
                 }
@@ -164,37 +159,37 @@ struct HistoryView: View {
         }
     }
 
-    // MARK: - Footer
+    // MARK: - Footer (hint + gear menu)
 
     private var footer: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                Toggle("To clipboard", isOn: Bindable(model).copyToClipboardEnabled)
-                    .help("Also place every captured selection on the system clipboard (classic auto-copy). Off = history only, your clipboard stays untouched.")
-                Toggle("Popup", isOn: Bindable(model).toastEnabled)
-                Toggle("Start at login", isOn: Bindable(model).launchAtLogin)
-                Spacer()
+        HStack {
+            Text("⌥V pastes latest")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Menu {
+                Toggle("Copy to Clipboard", isOn: Bindable(model).copyToClipboardEnabled)
+                    .help("Place every captured selection on the system clipboard. Off: selections stay in Marker only.")
+                Toggle("Show Popup", isOn: Bindable(model).toastEnabled)
+                Toggle("Start at Login", isOn: Bindable(model).launchAtLogin)
+                Divider()
+                Button("Clear History…") { model.history.clear() }
+                    .disabled(model.history.items.isEmpty)
+                Divider()
+                Button("Check for Updates…") { model.checkForUpdates() }
+                Button("Quit Marker") { NSApp.terminate(nil) }
+                    .keyboardShortcut("q")
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
             }
-            .toggleStyle(.checkbox)
-            .font(.caption)
-            HStack {
-                Button("Clear") {
-                    model.history.clear()
-                }
-                .disabled(model.history.items.isEmpty)
-                Spacer()
-                Button("Updates…") {
-                    model.checkForUpdates()
-                }
-                Button("Quit") {
-                    NSApp.terminate(nil)
-                }
-            }
-            .buttonStyle(.borderless)
-            .font(.callout)
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
     }
 }
 
@@ -208,6 +203,8 @@ private struct HistoryRow: View {
         Button(action: onCopy) {
             HStack(alignment: .top, spacing: 8) {
                 Image(nsImage: AppIcons.icon(for: item.bundleID))
+                    .resizable()
+                    .frame(width: 20, height: 20)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.text.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -218,21 +215,26 @@ private struct HistoryRow: View {
                         Text(item.appName)
                         Text("·")
                         Text(item.date, format: .dateTime.hour().minute())
-                        if isHovered {
-                            Spacer()
-                            Text("Click to copy")
-                        }
                     }
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 }
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 3)
+                    .opacity(isHovered ? 1 : 0)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(isHovered ? Color.primary.opacity(0.06) : .clear)
+        .background(
+            isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        .padding(.horizontal, 6)
         .onHover { isHovered = $0 }
     }
 }
