@@ -15,6 +15,12 @@ let package = Package(
             ],
             path: "Sources/Marker",
             swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "MarkerTests",
+            dependencies: ["Marker"],
+            path: "Tests/MarkerTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )

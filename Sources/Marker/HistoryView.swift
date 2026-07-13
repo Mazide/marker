@@ -139,7 +139,7 @@ struct HistoryView: View {
                         Section {
                             ForEach(group.items) { item in
                                 HistoryRow(item: item) {
-                                    Paster.copyToClipboard(item.text)
+                                    model.copyToClipboard(item.text)
                                     dismiss()
                                 }
                             }

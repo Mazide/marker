@@ -1,21 +1,18 @@
 import AppKit
 
-/// Watches global mouse events and reports gestures that look like a text
-/// selection: a drag beyond a small threshold, or a double/triple click.
+/// Watches global mouse events and reports raw gestures; the engine
+/// decides what they mean.
 final class MouseMonitor {
-    /// Called with the pasteboard changeCount recorded at mouse-down, so the
-    /// handler can tell whether the app copy-on-selected by itself.
-    var onSelectionGesture: ((Int) -> Void)?
     var onMouseDown: (() -> Void)?
+    /// A drag beyond a small threshold, or a double/triple click.
+    var onSelectionGesture: (() -> Void)?
 
     private var monitors: [Any] = []
     private var downLocation: NSPoint = .zero
-    private var downChangeCount = 0
 
     func start() {
         let down = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             self?.downLocation = NSEvent.mouseLocation
-            self?.downChangeCount = NSPasteboard.general.changeCount
             self?.onMouseDown?()
         }
         let up = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
@@ -25,7 +22,7 @@ final class MouseMonitor {
             let dy = location.y - self.downLocation.y
             let dragged = (dx * dx + dy * dy).squareRoot() > 5
             if dragged || event.clickCount >= 2 {
-                self.onSelectionGesture?(self.downChangeCount)
+                self.onSelectionGesture?()
             }
         }
         monitors = [down, up].compactMap { $0 }
