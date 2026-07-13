@@ -27,14 +27,28 @@ final class HistoryStore {
         load()
     }
 
-    func push(text: String, app: NSRunningApplication) {
-        guard items.first?.text != text else { return }
+    /// Refinements of the same selection gesture (double-click a word, then
+    /// drag to extend) replace the previous entry within this window.
+    private let refinementWindow: TimeInterval = 12
+
+    func push(text rawText: String, app: NSRunningApplication) {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, items.first?.text != text else { return }
+
+        let bundleID = app.bundleIdentifier ?? ""
+        if let first = items.first,
+           first.bundleID == bundleID,
+           Date.now.timeIntervalSince(first.date) < refinementWindow,
+           text.contains(first.text) || first.text.contains(text) {
+            items.removeFirst()
+        }
+
         let item = SelectionItem(
             id: UUID(),
             text: text,
             date: .now,
             appName: app.localizedName ?? "Unknown",
-            bundleID: app.bundleIdentifier ?? ""
+            bundleID: bundleID
         )
         items.removeAll { $0.text == text }
         items.insert(item, at: 0)

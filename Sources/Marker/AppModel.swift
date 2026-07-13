@@ -81,7 +81,9 @@ final class AppModel {
         }
     }
 
-    private func ingest(text: String, app: NSRunningApplication, viaAX: Bool) {
+    private func ingest(text rawText: String, app: NSRunningApplication, viaAX: Bool) {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
         if viaAX, let bundleID = app.bundleIdentifier {
             axProvenApps.insert(bundleID)
         }

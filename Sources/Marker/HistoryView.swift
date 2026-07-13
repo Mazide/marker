@@ -96,7 +96,8 @@ struct HistoryView: View {
         model.history.items.filter { item in
             if let filterBundleID, item.bundleID != filterBundleID { return false }
             if !searchText.isEmpty,
-               !item.text.localizedCaseInsensitiveContains(searchText) { return false }
+               !item.text.localizedCaseInsensitiveContains(searchText),
+               !item.appName.localizedCaseInsensitiveContains(searchText) { return false }
             return true
         }
     }
