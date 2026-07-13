@@ -23,7 +23,7 @@ private struct GeneralSettingsView: View {
 
     private var form: some View {
         Form {
-            Section(header: SectionHeader("Updates")) {
+            Section("Updates") {
                 LabeledContent("Version \(model.appVersion)") {
                     Button("Check Now…") {
                         model.checkForUpdates()
@@ -35,7 +35,7 @@ private struct GeneralSettingsView: View {
                     }
             }
 
-            Section(header: SectionHeader("Capture")) {
+            Section("Capture") {
                 SettingToggle(
                     "Copy selections to the clipboard",
                     caption: "Every selection lands on the system clipboard, ready to ⌘V. Off: selections stay in Marker's history only, and ⌥V pastes the latest.",
@@ -53,7 +53,7 @@ private struct GeneralSettingsView: View {
                 )
             }
 
-            Section(header: SectionHeader("Paste")) {
+            Section("Paste") {
                 SettingToggle(
                     "Middle-click pastes the latest selection",
                     caption: "Works over text fields; clicks anywhere else pass through untouched.",
@@ -66,12 +66,12 @@ private struct GeneralSettingsView: View {
                 )
             }
 
-            Section(header: SectionHeader("Interface")) {
+            Section("Interface") {
                 Toggle("Show a popup on capture", isOn: Bindable(model).toastEnabled)
                 Toggle("Start at login", isOn: Bindable(model).launchAtLogin)
             }
 
-            Section(header: SectionHeader("History")) {
+            Section("History") {
                 LabeledContent("Remove every captured selection") {
                     Button("Clear History…", role: .destructive) {
                         model.history.clear()
@@ -119,18 +119,5 @@ private struct SettingToggle: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-}
-
-/// Grouped-form headers sit inset with the row content by default; the
-/// system settings look aligns them with the group box's edge.
-private struct SectionHeader: View {
-    let title: String
-
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .padding(.leading, -16)
     }
 }
