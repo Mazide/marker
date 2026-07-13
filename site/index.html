@@ -70,6 +70,13 @@
       position: relative;
     }
 
+    ul.how li b {
+      display: block;
+      color: #181714;
+      font-weight: 600;
+      margin-bottom: 1px;
+    }
+
     ul.how li::before {
       content: "";
       position: absolute;
@@ -152,6 +159,10 @@
         color: #c9c1b5;
       }
 
+      ul.how li b {
+        color: #f3efe8;
+      }
+
       kbd {
         border-color: #3a3731;
         background: #201e1b;
@@ -185,9 +196,22 @@
       </div>
     </div>
     <ul class="how">
-      <li>Works system-wide: native apps, browsers, Telegram, terminals.</li>
-      <li>Selected text goes straight to your clipboard, ready to <kbd>⌘ V</kbd>. Prefer your clipboard untouched? Turn that off: selections stay inside Marker, and <kbd>⌥ V</kbd> pastes the latest.</li>
-      <li>Selected something yesterday and lost it? It's still in the menu bar: search it or browse by app.</li>
+      <li>
+        <b>Everywhere on your Mac.</b>
+        Native apps, browsers, Telegram, Slack, terminals. No extension, no per-app setup.
+      </li>
+      <li>
+        <b>Selected is copied.</b>
+        The text goes straight to your clipboard, ready to <kbd>⌘ V</kbd>. Want your clipboard left alone? Turn that off and selections stay inside Marker instead.
+      </li>
+      <li>
+        <b>Paste without the keyboard.</b>
+        <kbd>⌥ V</kbd> pastes the latest selection. Or turn on middle-click paste — three-finger tap on a trackpad — and drop it straight into any text field, X11 style.
+      </li>
+      <li>
+        <b>Nothing gets lost.</b>
+        Every selection stays in the menu bar: search it, browse it by app, or find what you selected last week. API keys and tokens are never saved.
+      </li>
     </ul>
     <div class="buttons">
       <a class="btn primary" href="/marker-0.8.1-22.dmg">
