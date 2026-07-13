@@ -195,13 +195,18 @@ struct HistoryView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
+                    // The glyph is 13pt; the row is short, so the button
+                    // needs its own hit area to be comfortably clickable.
+                    .frame(width: 28, height: 24)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .keyboardShortcut(",")
             .help("Settings")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .padding(.vertical, 4)
     }
 }
 

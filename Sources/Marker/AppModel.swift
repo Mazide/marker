@@ -179,6 +179,18 @@ final class AppModel {
         updaterController.checkForUpdates(nil)
     }
 
+    /// Sparkle's own preference — it persists this itself.
+    var autoUpdatesEnabled: Bool {
+        get { updaterController.updater.automaticallyChecksForUpdates }
+        set { updaterController.updater.automaticallyChecksForUpdates = newValue }
+    }
+
+    var appVersion: String {
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
+    }
+
     func copyToClipboard(_ text: String) {
         pasteboard.writeString(text)
     }
