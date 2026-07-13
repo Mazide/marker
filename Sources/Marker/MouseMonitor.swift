@@ -6,6 +6,7 @@ final class MouseMonitor {
     /// Called with the pasteboard changeCount recorded at mouse-down, so the
     /// handler can tell whether the app copy-on-selected by itself.
     var onSelectionGesture: ((Int) -> Void)?
+    var onMouseDown: (() -> Void)?
 
     private var monitors: [Any] = []
     private var downLocation: NSPoint = .zero
@@ -15,6 +16,7 @@ final class MouseMonitor {
         let down = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             self?.downLocation = NSEvent.mouseLocation
             self?.downChangeCount = NSPasteboard.general.changeCount
+            self?.onMouseDown?()
         }
         let up = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
             guard let self else { return }

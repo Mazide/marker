@@ -26,6 +26,9 @@ final class AppModel {
     /// empty AX read means "nothing selected", so never fall back to Cmd+C
     /// (which could copy a whole line in editors like VS Code).
     @ObservationIgnored private var axProvenApps: Set<String> = []
+    /// Clipboard contents at mouse-down in a fallback-eligible app, so a
+    /// self-copy-on-select (kitty, TUIs) can be undone after ingesting.
+    @ObservationIgnored private var downSnapshot: PasteboardSnapshot?
     /// Element roles where a drag is not a text selection.
     private static let nonTextRoles: Set<String> = [
         "AXScrollBar", "AXSlider", "AXButton", "AXMenuItem", "AXMenu",
@@ -39,6 +42,20 @@ final class AppModel {
         }
         mouseMonitor.onSelectionGesture = { [weak self] downChangeCount in
             self?.handleSelectionGesture(downChangeCount: downChangeCount)
+        }
+        mouseMonitor.onMouseDown = { [weak self] in
+            guard let self else { return }
+            // Snapshot only in fallback-eligible apps to avoid copying
+            // pasteboard data on every click system-wide.
+            guard self.axTrusted, self.fallbackCopyEnabled,
+                  let app = NSWorkspace.shared.frontmostApplication,
+                  app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                  !self.axProvenApps.contains(app.bundleIdentifier ?? "")
+            else {
+                self.downSnapshot = nil
+                return
+            }
+            self.downSnapshot = FallbackCopier.snapshot(NSPasteboard.general)
         }
         hotkey.onHotkey = { [weak self] in
             guard let item = self?.history.items.first else { return }
@@ -85,12 +102,17 @@ final class AppModel {
                   self.axProvenApps.contains(app.bundleIdentifier ?? "") == false
             else { return }
             // The app copy-on-selected by itself (terminals, TUIs): the
-            // selection is already on the clipboard — just take it.
+            // selection is already on the clipboard — take it, then put the
+            // user's previous clipboard back.
             if NSPasteboard.general.changeCount != downChangeCount {
                 if let text = NSPasteboard.general.string(forType: .string),
                    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     markerLog.info("app self-copied \(text.count) chars")
                     self.ingest(text: text, app: app, viaAX: false)
+                }
+                if let snapshot = self.downSnapshot {
+                    FallbackCopier.restore(NSPasteboard.general, from: snapshot)
+                    self.downSnapshot = nil
                 }
                 return
             }

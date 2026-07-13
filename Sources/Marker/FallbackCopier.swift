@@ -3,8 +3,10 @@ import AppKit
 /// Last-resort capture for apps that don't expose selections via
 /// Accessibility (Telegram, kitty, Sublime, …): synthesize Cmd+C, grab the
 /// copied string, then restore the clipboard to its previous contents.
+typealias PasteboardSnapshot = [[NSPasteboard.PasteboardType: Data]]
+
 enum FallbackCopier {
-    private typealias Snapshot = [[NSPasteboard.PasteboardType: Data]]
+    typealias Snapshot = PasteboardSnapshot
 
     static func capture(completion: @escaping (String?) -> Void) {
         let pasteboard = NSPasteboard.general
@@ -42,7 +44,7 @@ enum FallbackCopier {
         }
     }
 
-    private static func snapshot(_ pasteboard: NSPasteboard) -> Snapshot {
+    static func snapshot(_ pasteboard: NSPasteboard) -> Snapshot {
         (pasteboard.pasteboardItems ?? []).map { item in
             var entry: [NSPasteboard.PasteboardType: Data] = [:]
             for type in item.types {
@@ -54,7 +56,7 @@ enum FallbackCopier {
         }
     }
 
-    private static func restore(_ pasteboard: NSPasteboard, from saved: Snapshot) {
+    static func restore(_ pasteboard: NSPasteboard, from saved: Snapshot) {
         pasteboard.clearContents()
         let items = saved.map { entry in
             let item = NSPasteboardItem()
