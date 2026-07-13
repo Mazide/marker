@@ -172,6 +172,7 @@ struct HistoryView: View {
                 Toggle("To clipboard", isOn: Bindable(model).copyToClipboardEnabled)
                     .help("Also place every captured selection on the system clipboard (classic auto-copy). Off = history only, your clipboard stays untouched.")
                 Toggle("Popup", isOn: Bindable(model).toastEnabled)
+                Toggle("Start at login", isOn: Bindable(model).launchAtLogin)
                 Spacer()
             }
             .toggleStyle(.checkbox)

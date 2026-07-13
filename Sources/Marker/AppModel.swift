@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Observation
+import ServiceManagement
 import Sparkle
 
 @Observable
@@ -13,6 +14,21 @@ final class AppModel {
 
     var toastEnabled: Bool = UserDefaults.standard.object(forKey: "toastEnabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
+    }
+
+    var launchAtLogin: Bool = (SMAppService.mainApp.status == .enabled) {
+        didSet {
+            guard oldValue != launchAtLogin else { return }
+            do {
+                if launchAtLogin {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                markerLog.error("login item: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     /// Classic auto-copy: captured selections also land on the system
@@ -70,6 +86,16 @@ final class AppModel {
             Paster.pasteIntoActiveApp(item.text)
         }
         hotkey.register()
+
+        // First run from /Applications: start at login by default (the
+        // system notifies the user; the toggle can turn it off). Dev builds
+        // outside /Applications never self-register.
+        let offeredKey = "didEnableLaunchAtLogin"
+        if !UserDefaults.standard.bool(forKey: offeredKey),
+           Bundle.main.bundlePath.hasPrefix("/Applications/") {
+            UserDefaults.standard.set(true, forKey: offeredKey)
+            launchAtLogin = true
+        }
 
         markerLog.info("start: AX trusted = \(self.axTrusted)")
         promptForAccessibilityIfNeeded()
