@@ -9,13 +9,22 @@ final class ToastPresenter {
     private var panel: NSPanel?
     private var hideTimer: Timer?
 
+    enum Caption {
+        case copiedFrom(appName: String, bundleID: String)
+        case pasted(index: Int, total: Int)
+    }
+
     func show(text: String, appName: String, bundleID: String) {
+        show(text: text, caption: .copiedFrom(appName: appName, bundleID: bundleID))
+    }
+
+    func show(text: String, caption: Caption) {
         let snippet = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n", with: " ")
 
         let hosting = NSHostingView(
-            rootView: ToastView(text: snippet, appName: appName, bundleID: bundleID)
+            rootView: ToastView(text: snippet, caption: caption)
         )
         var size = hosting.fittingSize
         size.height = min(size.height, 120)
@@ -94,8 +103,7 @@ final class ToastPresenter {
 
 private struct ToastView: View {
     let text: String
-    let appName: String
-    let bundleID: String
+    let caption: ToastPresenter.Caption
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -105,15 +113,22 @@ private struct ToastView: View {
                     .frame(width: 14, height: 14)
                 Text("Marker")
                     .font(.caption2.weight(.semibold))
-                Text("· copied from")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Image(nsImage: AppIcons.icon(for: bundleID))
-                    .resizable()
-                    .frame(width: 12, height: 12)
-                Text(appName)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                switch caption {
+                case .copiedFrom(let appName, let bundleID):
+                    Text("· copied from")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Image(nsImage: AppIcons.icon(for: bundleID))
+                        .resizable()
+                        .frame(width: 12, height: 12)
+                    Text(appName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                case .pasted(let index, let total):
+                    Text("· pasted \(index) of \(total)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             Text(text)
                 .font(.system(size: 12.5))

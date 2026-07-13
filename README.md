@@ -18,8 +18,9 @@ go to the separate history only.
   copy-on-select, with the previous clipboard restored afterwards.
 - Unlimited history, grouped by day, with search and per-app filter;
   source app icon and timestamp on every entry.
-- **⌥V** pastes the most recent selection into the active app. The system
-  clipboard is briefly swapped and then restored.
+- **⌥V** pastes the most recent selection into the active app. A quick
+  series of selections becomes a queue: ⌥V ⌥V ⌥V pastes them in the
+  order you selected them. The system clipboard is restored after.
 - Menu bar popover: click any history entry to copy it to the clipboard.
 - Auto-updates via Sparkle.
 
