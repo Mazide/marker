@@ -15,9 +15,10 @@ if pgrep -xq Marker; then
   sleep 0.5
 fi
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Marker "$APP/Contents/MacOS/Marker"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Sign with a real identity: ad-hoc signatures change cdhash on every
 # rebuild, which silently revokes the Accessibility (TCC) grant.
