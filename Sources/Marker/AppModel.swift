@@ -10,10 +10,6 @@ final class AppModel {
     let history = HistoryStore()
     var axTrusted = AXIsProcessTrusted()
 
-    var fallbackCopyEnabled: Bool = UserDefaults.standard.object(forKey: "fallbackCopyEnabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(fallbackCopyEnabled, forKey: "fallbackCopyEnabled") }
-    }
-
     var toastEnabled: Bool = UserDefaults.standard.object(forKey: "toastEnabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
     }
@@ -53,7 +49,7 @@ final class AppModel {
             guard let self else { return }
             // Snapshot only in fallback-eligible apps to avoid copying
             // pasteboard data on every click system-wide.
-            guard self.axTrusted, self.fallbackCopyEnabled,
+            guard self.axTrusted,
                   let app = NSWorkspace.shared.frontmostApplication,
                   app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
                   !self.axProvenApps.contains(app.bundleIdentifier ?? "")
@@ -107,8 +103,7 @@ final class AppModel {
                 self.ingest(text: text, app: app, viaAX: true)
                 return
             }
-            guard self.fallbackCopyEnabled,
-                  self.axProvenApps.contains(app.bundleIdentifier ?? "") == false
+            guard self.axProvenApps.contains(app.bundleIdentifier ?? "") == false
             else { return }
             // The app copy-on-selected by itself (terminals, TUIs): the
             // selection is already on the clipboard — take it, then put the
