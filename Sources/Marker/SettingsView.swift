@@ -24,6 +24,9 @@ private struct GeneralSettingsView: View {
                 Toggle("Ignore selections you immediately edit", isOn: Bindable(model).retractEditedEnabled)
                 Text("In editable fields Marker waits half a second before saving a selection. If you type over it in that window, nothing is captured.")
                     .settingsCaption()
+                Toggle("Never save secrets", isOn: Bindable(model).skipSecretsEnabled)
+                Text("API keys, tokens and private keys still reach your clipboard, but are kept out of history.")
+                    .settingsCaption()
             }
             Section("Paste") {
                 Toggle("Middle-click pastes the latest selection", isOn: Bindable(model).middleClickPasteEnabled)

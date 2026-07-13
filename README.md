@@ -21,6 +21,9 @@ go to the separate history only.
 - **⌥V** pastes the most recent selection into the active app. The system
   clipboard is briefly swapped and then restored.
 - Menu bar popover: click any history entry to copy it to the clipboard.
+- Secrets (API keys, tokens, private keys) reach your clipboard but are
+  never written to history.
+- Delete single entries from the popover; clear everything from Settings.
 - Auto-updates via Sparkle.
 
 ## Build & run

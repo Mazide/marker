@@ -121,37 +121,39 @@ struct HistoryView: View {
     @ViewBuilder
     private var content: some View {
         if !model.axTrusted {
-            ContentUnavailableView {
-                Label("Accessibility Access Needed", systemImage: "hand.raised")
-            } description: {
-                Text("Marker needs Accessibility access to see text selections.")
-            } actions: {
-                Button("Open System Settings") {
-                    model.openAccessibilitySettings()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .frame(minHeight: 180)
-        } else if model.history.items.isEmpty {
-            ContentUnavailableView(
-                "No Selections Yet",
-                systemImage: "character.cursor.ibeam",
-                description: Text("Select text in any app. It lands here.")
+            EmptyState(
+                icon: "hand.raised.fill",
+                title: "One permission needed",
+                message: "Marker reads selections through macOS Accessibility. Nothing leaves your Mac.",
+                actionTitle: "Open System Settings",
+                action: { model.openAccessibilitySettings() }
             )
-            .frame(minHeight: 160)
+        } else if model.history.items.isEmpty {
+            EmptyState(
+                icon: "cursorarrow.motionlines",
+                title: "Nothing here yet",
+                message: "Select text in any app — it lands here, already copied."
+            )
         } else if filteredItems.isEmpty {
-            ContentUnavailableView.search(text: searchText)
-                .frame(minHeight: 160)
+            EmptyState(
+                icon: "magnifyingglass",
+                title: "No matches",
+                message: "Nothing selected like that. Try fewer letters or another app filter."
+            )
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     ForEach(dayGroups, id: \.day) { group in
                         Section {
                             ForEach(group.items) { item in
-                                HistoryRow(item: item) {
-                                    model.copyToClipboard(item.text)
-                                    dismiss()
-                                }
+                                HistoryRow(
+                                    item: item,
+                                    onCopy: {
+                                        model.copyToClipboard(item.text)
+                                        dismiss()
+                                    },
+                                    onDelete: { model.history.delete(item) }
+                                )
                                 .onAppear {
                                     // Infinite scroll: reaching the oldest
                                     // loaded row pulls the next page.
@@ -201,9 +203,46 @@ struct HistoryView: View {
     }
 }
 
+private struct EmptyState: View {
+    let icon: String
+    let title: String
+    let message: String
+    var actionTitle: String?
+    var action: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(HistoryView.accent)
+                .frame(width: 42, height: 42)
+                .background(HistoryView.accent.opacity(0.14), in: Circle())
+                .padding(.bottom, 2)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 250)
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.borderedProminent)
+                    .tint(HistoryView.accent)
+                    .controlSize(.small)
+                    .padding(.top, 6)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 170)
+        .padding(.vertical, 14)
+    }
+}
+
 private struct HistoryRow: View {
     let item: SelectionItem
     let onCopy: () -> Void
+    let onDelete: () -> Void
 
     @State private var isHovered = false
 
@@ -233,17 +272,31 @@ private struct HistoryRow: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 1)
                 }
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 3)
-                    .opacity(isHovered ? 1 : 0)
+                VStack(spacing: 4) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Button(action: onDelete) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete this entry")
+                }
+                .padding(.top, 3)
+                .opacity(isHovered ? 1 : 0)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button("Copy", action: onCopy)
+            Divider()
+            Button("Delete", role: .destructive, action: onDelete)
+        }
         .background(
             isHovered ? AnyShapeStyle(Color.primary.opacity(0.07)) : AnyShapeStyle(.clear),
             in: RoundedRectangle(cornerRadius: 8)

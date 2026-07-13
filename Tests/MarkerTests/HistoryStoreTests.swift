@@ -124,16 +124,13 @@ final class HistoryStoreTests: XCTestCase {
     }
 }
 extension HistoryStoreTests {
-    func testRetractRemovesOnlyMatchingNewestEntry() {
+    func testDeleteRemovesEntryFromStoreAndDatabase() {
         store.push(text: "keep", app: telegram)
         clock = clock.addingTimeInterval(60)
-        store.push(text: "edited away", app: telegram)
+        store.push(text: "secret", app: telegram)
 
-        store.retract(text: "edited away")
+        store.delete(store.items[0])
         XCTAssertEqual(store.items.map(\.text), ["keep"])
         XCTAssertEqual(db.count(), 1)
-
-        store.retract(text: "nonexistent")
-        XCTAssertEqual(store.items.count, 1, "mismatched retract is a no-op")
     }
 }

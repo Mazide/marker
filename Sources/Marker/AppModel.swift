@@ -61,6 +61,11 @@ final class AppModel {
         }
     }
 
+    /// API keys, tokens and private keys are never written to history.
+    var skipSecretsEnabled: Bool = UserDefaults.standard.object(forKey: "skipSecretsEnabled") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(skipSecretsEnabled, forKey: "skipSecretsEnabled") }
+    }
+
     // System layer
     @ObservationIgnored private let pasteboard = SystemPasteboard()
     @ObservationIgnored private let keys = CGEventKeySynthesizer()
@@ -184,6 +189,16 @@ final class AppModel {
     }
 
     private func ingest(text: String, app: SourceApp) {
+        // Secrets pass through to the clipboard (the user selected them on
+        // purpose) but are never persisted to history.
+        if skipSecretsEnabled, SecretDetector.looksSecret(text) {
+            markerLog.info("skipped a selection that looks like a secret")
+            if copyToClipboardEnabled {
+                pasteboard.writeString(text)
+            }
+            return
+        }
+
         let isNew = history.items.first?.text != text
         history.push(text: text, app: app)
         if copyToClipboardEnabled {
