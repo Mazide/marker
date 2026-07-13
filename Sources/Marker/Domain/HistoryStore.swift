@@ -62,6 +62,14 @@ final class HistoryStore {
         db.insert(item)
     }
 
+    /// Remove the newest entry if it matches — a capture that turned out
+    /// to be select-to-edit.
+    func retract(text: String) {
+        guard let first = items.first, first.text == text else { return }
+        items.removeFirst()
+        db.delete(id: first.id)
+    }
+
     /// Append the next page of older entries to the in-memory window.
     func loadMore() {
         guard canLoadMore else { return }

@@ -3,8 +3,15 @@ import SwiftUI
 struct HistoryView: View {
     private var model = AppModel.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openSettings) private var openSettingsAction
     @State private var searchText = ""
     @State private var filterBundleID: String?
+
+    private func openSettings() {
+        dismiss()
+        NSApp.activate(ignoringOtherApps: true)
+        openSettingsAction()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -179,14 +186,8 @@ struct HistoryView: View {
                 .foregroundStyle(.tertiary)
             Spacer()
             Menu {
-                Toggle("Copy to Clipboard", isOn: Bindable(model).copyToClipboardEnabled)
-                    .help("Place every captured selection on the system clipboard. Off: selections stay in Marker only.")
-                Toggle("Show Popup", isOn: Bindable(model).toastEnabled)
-                Toggle("Start at Login", isOn: Bindable(model).launchAtLogin)
-                Toggle("Middle-Click Paste", isOn: Bindable(model).middleClickPasteEnabled)
-                    .help("X11-style: middle-click in a text field pastes the latest selection. Clicks outside text fields pass through.")
-                Toggle("Three-Finger Tap Paste", isOn: Bindable(model).threeFingerTapEnabled)
-                    .help("Experimental: a quick three-finger trackpad tap over a text field pastes the latest selection.")
+                Button("Settings…") { openSettings() }
+                    .keyboardShortcut(",")
                 Divider()
                 Button("Clear History…") { model.history.clear() }
                     .disabled(model.history.items.isEmpty)

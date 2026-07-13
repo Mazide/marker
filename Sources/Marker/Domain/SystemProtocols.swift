@@ -29,6 +29,8 @@ protocol SelectionReading: AnyObject {
     func currentSelection() -> String?
     /// AX role of the element under the mouse cursor.
     func roleAtMouseLocation() -> String?
+    /// AX role of the focused element.
+    func focusedElementRole() -> String?
 }
 
 protocol FrontmostAppProviding: AnyObject {

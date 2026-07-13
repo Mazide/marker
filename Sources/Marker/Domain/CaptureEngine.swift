@@ -13,6 +13,9 @@ final class CaptureEngine {
         var settleDelay: TimeInterval = 0.15
         var pollInterval: TimeInterval = 0.05
         var pollAttempts: Int = 16
+        /// Typing over a fresh selection within this window means the
+        /// selection was made to edit, not to copy — the capture retracts.
+        var retractWindow: TimeInterval = 1.2
     }
 
     /// Element roles where a drag is not a text selection.
@@ -23,6 +26,9 @@ final class CaptureEngine {
     ]
 
     var onCapture: ((_ text: String, _ app: SourceApp, _ viaAX: Bool) -> Void)?
+    /// A just-captured selection turned out to be select-to-edit.
+    var onRetract: ((_ text: String) -> Void)?
+    var retractionEnabled = true
 
     private let selection: SelectionReading
     private let pasteboard: PasteboardControlling
@@ -41,6 +47,15 @@ final class CaptureEngine {
     private var axProvenApps: Set<String> = []
     private var downChangeCount = 0
     private var downSnapshot: PasteboardSnapshot?
+
+    private struct LastCapture {
+        let text: String
+        let bundleID: String
+        let editable: Bool
+        let viaAX: Bool
+        let at: Date
+    }
+    private var lastCapture: LastCapture?
 
     init(
         selection: SelectionReading,
@@ -62,9 +77,22 @@ final class CaptureEngine {
 
     // MARK: - Inputs from the system layer
 
-    func keyDown(isSelectionIntent: Bool) {
+    func keyDown(isSelectionIntent: Bool, isPlainTyping: Bool) {
         lastKeyDown = now()
         lastKeyWasSelectionIntent = isSelectionIntent
+
+        // Select-to-edit: typing right after capturing from an editable
+        // field means the user selected to replace/delete, not to copy.
+        // Fallback captures (terminals) are exempt — selecting output and
+        // typing the next command is normal there.
+        if isPlainTyping, retractionEnabled,
+           let capture = lastCapture, capture.viaAX, capture.editable,
+           now().timeIntervalSince(capture.at) < config.retractWindow,
+           frontmost.frontmostApp()?.bundleID == capture.bundleID {
+            lastCapture = nil
+            markerLog.info("retracting select-to-edit capture")
+            onRetract?(capture.text)
+        }
     }
 
     /// AX selection-changed notification; fires on every caret move while
@@ -179,6 +207,13 @@ final class CaptureEngine {
         if viaAX, !app.bundleID.isEmpty {
             axProvenApps.insert(app.bundleID)
         }
+        lastCapture = LastCapture(
+            text: text,
+            bundleID: app.bundleID,
+            editable: MiddlePastePolicy.shouldPaste(role: selection.focusedElementRole()),
+            viaAX: viaAX,
+            at: now()
+        )
         markerLog.info("captured \(text.count) chars viaAX=\(viaAX)")
         onCapture?(text, app, viaAX)
     }

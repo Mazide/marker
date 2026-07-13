@@ -15,6 +15,10 @@ struct MarkerApp: App {
             }
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+        }
     }
 
     /// Mono glyph of the app icon (highlight stripe + I-beam), drawn in

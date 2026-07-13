@@ -52,6 +52,15 @@ final class AppModel {
         }
     }
 
+    /// Selections immediately typed over were made to edit, not to copy;
+    /// they are removed from history.
+    var retractEditedEnabled: Bool = UserDefaults.standard.object(forKey: "retractEditedEnabled") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(retractEditedEnabled, forKey: "retractEditedEnabled")
+            engine.retractionEnabled = retractEditedEnabled
+        }
+    }
+
     // System layer
     @ObservationIgnored private let pasteboard = SystemPasteboard()
     @ObservationIgnored private let keys = CGEventKeySynthesizer()
@@ -92,9 +101,13 @@ final class AppModel {
         axMonitor.onSelectionChanged = { [weak self] in
             self?.engine.axSelectionChanged()
         }
-        axMonitor.onKeyDown = { [weak self] isIntent in
-            self?.engine.keyDown(isSelectionIntent: isIntent)
+        axMonitor.onKeyDown = { [weak self] isIntent, isTyping in
+            self?.engine.keyDown(isSelectionIntent: isIntent, isPlainTyping: isTyping)
         }
+        engine.onRetract = { [weak self] text in
+            self?.history.retract(text: text)
+        }
+        engine.retractionEnabled = retractEditedEnabled
         mouseMonitor.onMouseDown = { [weak self] in
             self?.engine.mouseDown()
         }
@@ -119,10 +132,19 @@ final class AppModel {
             return true
         }
         trackpadTap.onThreeFingerTap = { [weak self] in
-            guard let self, self.threeFingerTapEnabled, self.axTrusted,
-                  MiddlePastePolicy.shouldPaste(role: self.axMonitor.roleAtMouseLocation()),
-                  let text = self.history.items.first?.text
-            else { return }
+            guard let self, self.threeFingerTapEnabled, self.axTrusted else { return }
+            // The tap pastes into the focused element, so accept either a
+            // text role under the cursor or a focused text element (kitty
+            // and friends hit-test as AXWindow but focus an AXTextArea).
+            let cursorRole = self.axMonitor.roleAtMouseLocation()
+            let focusedRole = MiddlePastePolicy.shouldPaste(role: cursorRole)
+                ? cursorRole
+                : self.axMonitor.focusedElementRole()
+            guard MiddlePastePolicy.shouldPaste(role: focusedRole) else {
+                markerLog.info("tap ignored: cursor=\(cursorRole ?? "nil", privacy: .public) focused=\(focusedRole ?? "nil", privacy: .public)")
+                return
+            }
+            guard let text = self.history.items.first?.text else { return }
             self.pasteEngine.pasteIntoActiveApp(text)
         }
         if threeFingerTapEnabled {

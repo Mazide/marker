@@ -55,9 +55,11 @@ final class FakeKeys: KeyEventSynthesizing {
 final class FakeSelectionReader: SelectionReading {
     var selection: String?
     var roleAtMouse: String?
+    var focusedRole: String?
 
     func currentSelection() -> String? { selection }
     func roleAtMouseLocation() -> String? { roleAtMouse }
+    func focusedElementRole() -> String? { focusedRole }
 }
 
 final class FakeFrontmost: FrontmostAppProviding {

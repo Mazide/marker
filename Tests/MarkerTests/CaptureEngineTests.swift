@@ -145,7 +145,7 @@ final class CaptureEngineTests: XCTestCase {
 
     func testProgrammaticSelectionAfterPlainKeystrokeIsSkipped() {
         reader.selection = "https://url-selected-by-cmd-l.example"
-        engine.keyDown(isSelectionIntent: false) // e.g. Cmd+L
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true) // e.g. Cmd+L
         engine.axSelectionChanged()
         scheduler.runAll()
 
@@ -154,7 +154,7 @@ final class CaptureEngineTests: XCTestCase {
 
     func testSelectionIntentKeystrokeIsCaptured() {
         reader.selection = "selected via shift+arrows"
-        engine.keyDown(isSelectionIntent: true)
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
 
@@ -164,7 +164,7 @@ final class CaptureEngineTests: XCTestCase {
 
     func testMouseSelectionLongAfterKeystrokeIsCaptured() {
         reader.selection = "mouse selection"
-        engine.keyDown(isSelectionIntent: false)
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
         clock = clock.addingTimeInterval(5) // intent window passed
         engine.axSelectionChanged()
         scheduler.runAll()
@@ -204,5 +204,70 @@ final class CaptureEngineTests: XCTestCase {
         scheduler.runAll()
 
         XCTAssertTrue(captures.isEmpty)
+    }
+
+    // MARK: - Select-to-edit retraction
+
+    private var retracted: [String] = []
+
+    private func captureEditable(_ text: String) {
+        reader.selection = text
+        reader.focusedRole = "AXTextArea"
+        engine.onRetract = { [unowned self] in self.retracted.append($0) }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+    }
+
+    func testTypingRightAfterEditableCaptureRetracts() {
+        captureEditable("draft sentence")
+        clock = clock.addingTimeInterval(0.5)
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
+
+        XCTAssertEqual(retracted, ["draft sentence"])
+    }
+
+    func testTypingAfterWindowDoesNotRetract() {
+        captureEditable("keeper")
+        clock = clock.addingTimeInterval(5)
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
+
+        XCTAssertTrue(retracted.isEmpty)
+    }
+
+    func testShortcutAfterCaptureDoesNotRetract() {
+        captureEditable("copied via cmd+c")
+        clock = clock.addingTimeInterval(0.3)
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: false) // e.g. ⌘C
+
+        XCTAssertTrue(retracted.isEmpty)
+    }
+
+    func testNonEditableCaptureNeverRetracts() {
+        reader.selection = "article text"
+        reader.focusedRole = "AXWebArea"
+        engine.onRetract = { [unowned self] in self.retracted.append($0) }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+        clock = clock.addingTimeInterval(0.3)
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
+
+        XCTAssertTrue(retracted.isEmpty, "read-only pages: space-to-scroll must not eat history")
+    }
+
+    func testFallbackCaptureNeverRetracts() {
+        // terminal-style: AX empty, app self-copied
+        reader.selection = nil
+        reader.focusedRole = "AXTextArea"
+        engine.onRetract = { [unowned self] in self.retracted.append($0) }
+        engine.mouseDown()
+        pasteboard.externalWrite("ls -la output")
+        engine.selectionGesture()
+        scheduler.runAll()
+        clock = clock.addingTimeInterval(0.3)
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
+
+        XCTAssertTrue(retracted.isEmpty, "select output then keep typing is normal terminal use")
     }
 }

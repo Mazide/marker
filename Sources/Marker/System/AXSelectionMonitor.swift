@@ -6,7 +6,7 @@ import ApplicationServices
 /// selections on demand. All decisions live in CaptureEngine.
 final class AXSelectionMonitor: NSObject, SelectionReading {
     var onSelectionChanged: (() -> Void)?
-    var onKeyDown: ((_ isSelectionIntent: Bool) -> Void)?
+    var onKeyDown: ((_ isSelectionIntent: Bool, _ isPlainTyping: Bool) -> Void)?
 
     private var observer: AXObserver?
     private var appElement: AXUIElement?
@@ -31,7 +31,13 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
                 // keyCode, not characters: on non-Latin layouts (RU: "ф")
                 // charactersIgnoringModifiers never matches "a".
                 let isSelectAll = flags.contains(.command) && event.keyCode == 0 // kVK_ANSI_A
-                self?.onKeyDown?(flags.contains(.shift) || isSelectAll)
+                let isSelectionIntent = flags.contains(.shift) || isSelectAll
+                let isArrow = (123...126).contains(Int(event.keyCode))
+                let isPlainTyping = !flags.contains(.command)
+                    && !flags.contains(.control)
+                    && !isArrow
+                    && !isSelectionIntent
+                self?.onKeyDown?(isSelectionIntent, isPlainTyping)
             }
         }
         attach(to: NSWorkspace.shared.frontmostApplication)
@@ -45,6 +51,19 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
         }
         guard let focused = focusedElement() else { return nil }
         return selectedText(of: focused)
+    }
+
+    /// Role of the focused element — apps with minimal AX trees (kitty)
+    /// return nothing useful from position hit-testing but do report focus.
+    func focusedElementRole() -> String? {
+        guard let focused = focusedElement() else { return nil }
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            focused,
+            kAXRoleAttribute as CFString,
+            &roleRef
+        ) == .success else { return nil }
+        return roleRef as? String
     }
 
     func roleAtMouseLocation() -> String? {
