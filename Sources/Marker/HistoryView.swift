@@ -167,7 +167,9 @@ struct HistoryView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
+                                // Aligns with the row's app icon: 6pt pill
+                                // inset + 8pt content inset.
+                                .padding(.horizontal, 14)
                                 .padding(.vertical, 5)
                                 .background(.regularMaterial)
                         }
@@ -239,6 +241,9 @@ private struct EmptyState: View {
     }
 }
 
+/// One captured selection. Three columns, one surface: app icon · snippet ·
+/// time. The row highlight is the only rounded rect — the text sits directly
+/// on it, the way a Finder or Spotlight row does.
 private struct HistoryRow: View {
     let item: SelectionItem
     let onCopy: () -> Void
@@ -246,62 +251,122 @@ private struct HistoryRow: View {
 
     @State private var isHovered = false
 
+    /// Line box of the snippet's first line — the vertical anchor the icon
+    /// and the timestamp are centered on.
+    private var firstLineHeight: CGFloat {
+        isCodeLike ? 16 : 18
+    }
+
+    /// Prose is collapsed to a single run so every row has the same shape.
+    /// Code keeps its line breaks (minus the source indentation) — the
+    /// shape of the lines is half of what makes code readable.
+    private var snippet: String {
+        if isCodeLike {
+            return item.text
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+                .prefix(2)
+                .joined(separator: "\n")
+        }
+        return item.text
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+
+    /// Monospace for what is meant to be read as literal text — URLs,
+    /// paths, identifiers, code — and the proportional face for prose.
+    /// Cyrillic and English sentences look wrong in monospace, which is
+    /// why this is a heuristic and not a global switch.
+    private var isCodeLike: Bool {
+        let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return false }
+
+        if text.contains("://") { return true }
+        if text.hasPrefix("/") || text.hasPrefix("~/") { return true }
+        if text.contains("\n"), text.contains(where: { "{};=<>()".contains($0) }) { return true }
+        // A single unbroken token (identifier, hash, key, filename).
+        if !text.contains(where: \.isWhitespace), text.count >= 8 { return true }
+
+        // Dense punctuation is a good proxy for source code.
+        let symbols = text.filter { "{}[]()<>;=+*/\\|&^%$#@_`~".contains($0) }.count
+        return Double(symbols) / Double(text.count) > 0.08
+    }
+
     var body: some View {
         Button(action: onCopy) {
             HStack(alignment: .top, spacing: 8) {
+                // The icon *is* the source label — hence no app-name caption.
+                // It is centered on the snippet's first line: baseline
+                // alignment drifts because the mono and proportional faces
+                // have different metrics, this does not.
                 Image(nsImage: AppIcons.icon(for: item.bundleID))
                     .resizable()
-                    .frame(width: 20, height: 20)
-                    .padding(.top, 1)
-                VStack(alignment: .leading, spacing: 3) {
-                    // The snippet sits on a chip so it reads as a copied
-                    // fragment, not as UI text.
-                    Text(item.text.trimmingCharacters(in: .whitespacesAndNewlines))
-                        .font(.callout)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-                    HStack(spacing: 4) {
-                        Text(item.appName)
-                        Text("·")
-                        Text(item.date, format: .dateTime.hour().minute())
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 1)
-                }
-                VStack(spacing: 4) {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                    .interpolation(.high)
+                    .frame(width: 16, height: 16)
+                    .frame(height: firstLineHeight)
+                    .help(item.appName)
+
+                // Captured text: rendered like content, not chrome — the
+                // list itself is the context, the way Maccy and Raycast do
+                // it. Chrome around it recedes to tertiary.
+                Text(snippet)
+                    .font(isCodeLike
+                          ? .system(.footnote, design: .monospaced)
+                          : .callout)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .truncationMode(isCodeLike ? .middle : .tail)
+                    .lineSpacing(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // One trailing slot: the timestamp lives here at rest and
+                // cross-fades to the delete button on hover, so the row
+                // never reflows and the actions stay pinned to the edge.
+                ZStack(alignment: .trailing) {
+                    Text(item.date, format: .dateTime.hour().minute())
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .opacity(isHovered ? 0 : 1)
+
                     Button(action: onDelete) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help("Delete this entry")
+                    .help("Delete")
+                    .opacity(isHovered ? 1 : 0)
+                    .allowsHitTesting(isHovered)
                 }
-                .padding(.top, 3)
-                .opacity(isHovered ? 1 : 0)
+                .fixedSize()
+                .frame(height: firstLineHeight)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(.quaternary)
+                .opacity(isHovered ? 1 : 0)
+        }
+        .padding(.horizontal, 6)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
         .contextMenu {
             Button("Copy", action: onCopy)
             Divider()
             Button("Delete", role: .destructive, action: onDelete)
         }
-        .background(
-            isHovered ? AnyShapeStyle(Color.primary.opacity(0.07)) : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: 8)
-        )
-        .padding(.horizontal, 6)
-        .onHover { isHovered = $0 }
+        // The app name is gone from the visuals, so keep it in the label.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(snippet), \(item.appName)")
+        .accessibilityHint("Copies this selection")
     }
 }
