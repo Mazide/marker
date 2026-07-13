@@ -206,68 +206,70 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertTrue(captures.isEmpty)
     }
 
-    // MARK: - Select-to-edit retraction
+    // MARK: - Select-to-edit suppression (delayed commit)
 
-    private var retracted: [String] = []
-
-    private func captureEditable(_ text: String) {
+    private func gestureCapture(_ text: String, focusedRole: String) {
         reader.selection = text
-        reader.focusedRole = "AXTextArea"
-        engine.onRetract = { [unowned self] in self.retracted.append($0) }
+        reader.focusedRole = focusedRole
         engine.mouseDown()
         engine.selectionGesture()
+    }
+
+    func testEditableCaptureCommitsAfterQuietDelay() {
+        gestureCapture("draft sentence", focusedRole: "AXTextArea")
+        scheduler.runNext() // settle -> schedules delayed commit
+        XCTAssertTrue(captures.isEmpty, "not committed before the delay")
+        scheduler.runAll()  // delay elapses
+
+        XCTAssertEqual(captures.map(\.text), ["draft sentence"])
+    }
+
+    func testTypingDuringDelayDropsCaptureSilently() {
+        gestureCapture("draft sentence", focusedRole: "AXTextArea")
+        scheduler.runNext() // settle -> pending commit
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
         scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty)
     }
 
-    func testTypingRightAfterEditableCaptureRetracts() {
-        captureEditable("draft sentence")
-        clock = clock.addingTimeInterval(0.5)
+    func testDroppedTextCanBeCapturedAgainLater() {
+        gestureCapture("same words", focusedRole: "AXTextArea")
+        scheduler.runNext()
         engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
-
-        XCTAssertEqual(retracted, ["draft sentence"])
-    }
-
-    func testTypingAfterWindowDoesNotRetract() {
-        captureEditable("keeper")
-        clock = clock.addingTimeInterval(5)
-        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
-
-        XCTAssertTrue(retracted.isEmpty)
-    }
-
-    func testShortcutAfterCaptureDoesNotRetract() {
-        captureEditable("copied via cmd+c")
-        clock = clock.addingTimeInterval(0.3)
-        engine.keyDown(isSelectionIntent: false, isPlainTyping: false) // e.g. ⌘C
-
-        XCTAssertTrue(retracted.isEmpty)
-    }
-
-    func testNonEditableCaptureNeverRetracts() {
-        reader.selection = "article text"
-        reader.focusedRole = "AXWebArea"
-        engine.onRetract = { [unowned self] in self.retracted.append($0) }
-        engine.mouseDown()
-        engine.selectionGesture()
         scheduler.runAll()
-        clock = clock.addingTimeInterval(0.3)
-        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
 
-        XCTAssertTrue(retracted.isEmpty, "read-only pages: space-to-scroll must not eat history")
+        gestureCapture("same words", focusedRole: "AXTextArea")
+        scheduler.runAll()
+        XCTAssertEqual(captures.map(\.text), ["same words"], "dedupe must not eat the re-selection")
     }
 
-    func testFallbackCaptureNeverRetracts() {
-        // terminal-style: AX empty, app self-copied
+    func testShortcutDuringDelayStillCommits() {
+        gestureCapture("copied via cmd+c", focusedRole: "AXTextArea")
+        scheduler.runNext()
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: false) // ⌘C
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 1)
+    }
+
+    func testReadOnlyContextCommitsInstantly() {
+        gestureCapture("article text", focusedRole: "AXWebArea")
+        scheduler.runNext() // settle job only
+
+        XCTAssertEqual(captures.count, 1, "no delay outside editable fields")
+    }
+
+    func testFallbackCaptureCommitsInstantly() {
         reader.selection = nil
         reader.focusedRole = "AXTextArea"
-        engine.onRetract = { [unowned self] in self.retracted.append($0) }
         engine.mouseDown()
         pasteboard.externalWrite("ls -la output")
         engine.selectionGesture()
-        scheduler.runAll()
-        clock = clock.addingTimeInterval(0.3)
-        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
+        scheduler.runNext() // settle: self-copy path
 
-        XCTAssertTrue(retracted.isEmpty, "select output then keep typing is normal terminal use")
+        XCTAssertEqual(captures.count, 1, "terminal self-copy is never delayed")
+        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
+        XCTAssertEqual(captures.count, 1, "typing after commit changes nothing")
     }
 }

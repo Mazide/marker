@@ -13,9 +13,10 @@ final class CaptureEngine {
         var settleDelay: TimeInterval = 0.15
         var pollInterval: TimeInterval = 0.05
         var pollAttempts: Int = 16
-        /// Typing over a fresh selection within this window means the
-        /// selection was made to edit, not to copy — the capture retracts.
-        var retractWindow: TimeInterval = 1.2
+        /// Captures from editable fields wait this long before committing;
+        /// typing within the window means select-to-edit and the capture is
+        /// silently dropped (no toast, no history churn).
+        var commitDelay: TimeInterval = 0.5
     }
 
     /// Element roles where a drag is not a text selection.
@@ -26,8 +27,7 @@ final class CaptureEngine {
     ]
 
     var onCapture: ((_ text: String, _ app: SourceApp, _ viaAX: Bool) -> Void)?
-    /// A just-captured selection turned out to be select-to-edit.
-    var onRetract: ((_ text: String) -> Void)?
+    /// Delay-and-drop select-to-edit filtering for editable fields.
     var retractionEnabled = true
 
     private let selection: SelectionReading
@@ -48,14 +48,13 @@ final class CaptureEngine {
     private var downChangeCount = 0
     private var downSnapshot: PasteboardSnapshot?
 
-    private struct LastCapture {
+    private struct PendingCommit {
         let text: String
-        let bundleID: String
-        let editable: Bool
+        let app: SourceApp
         let viaAX: Bool
-        let at: Date
+        let token: SchedulerToken
     }
-    private var lastCapture: LastCapture?
+    private var pendingCommit: PendingCommit?
 
     init(
         selection: SelectionReading,
@@ -81,17 +80,16 @@ final class CaptureEngine {
         lastKeyDown = now()
         lastKeyWasSelectionIntent = isSelectionIntent
 
-        // Select-to-edit: typing right after capturing from an editable
-        // field means the user selected to replace/delete, not to copy.
-        // Fallback captures (terminals) are exempt — selecting output and
-        // typing the next command is normal there.
-        if isPlainTyping, retractionEnabled,
-           let capture = lastCapture, capture.viaAX, capture.editable,
-           now().timeIntervalSince(capture.at) < config.retractWindow,
-           frontmost.frontmostApp()?.bundleID == capture.bundleID {
-            lastCapture = nil
-            markerLog.info("retracting select-to-edit capture")
-            onRetract?(capture.text)
+        // Typing while an editable-field capture is pending: the selection
+        // was made to replace/delete, not to copy — drop it silently.
+        if isPlainTyping,
+           let pending = pendingCommit,
+           frontmost.frontmostApp()?.bundleID == pending.app.bundleID {
+            pending.token.cancel()
+            pendingCommit = nil
+            // Allow the same text to be captured again later on purpose.
+            lastReported = nil
+            markerLog.info("dropped select-to-edit capture")
         }
     }
 
@@ -207,13 +205,25 @@ final class CaptureEngine {
         if viaAX, !app.bundleID.isEmpty {
             axProvenApps.insert(app.bundleID)
         }
-        lastCapture = LastCapture(
-            text: text,
-            bundleID: app.bundleID,
-            editable: MiddlePastePolicy.shouldPaste(role: selection.focusedElementRole()),
-            viaAX: viaAX,
-            at: now()
-        )
+
+        // Editable fields: hold the commit briefly. Typing in the window
+        // cancels it (select-to-edit); silence commits it. Fallback
+        // (terminal) captures and read-only contexts commit instantly.
+        let editable = MiddlePastePolicy.shouldPaste(role: selection.focusedElementRole())
+        if retractionEnabled, viaAX, editable {
+            pendingCommit?.token.cancel()
+            let token = scheduler.schedule(after: config.commitDelay) { [weak self] in
+                guard let self, let pending = self.pendingCommit else { return }
+                self.pendingCommit = nil
+                self.commit(pending.text, app: pending.app, viaAX: pending.viaAX)
+            }
+            pendingCommit = PendingCommit(text: text, app: app, viaAX: viaAX, token: token)
+        } else {
+            commit(text, app: app, viaAX: viaAX)
+        }
+    }
+
+    private func commit(_ text: String, app: SourceApp, viaAX: Bool) {
         markerLog.info("captured \(text.count) chars viaAX=\(viaAX)")
         onCapture?(text, app, viaAX)
     }

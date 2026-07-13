@@ -21,8 +21,8 @@ private struct GeneralSettingsView: View {
                 Toggle("Copy selections to the clipboard", isOn: Bindable(model).copyToClipboardEnabled)
                 Text("Every selection lands on the system clipboard, ready to ⌘V. Off: selections stay in Marker's history only, and ⌥V pastes the latest.")
                     .settingsCaption()
-                Toggle("Forget selections you immediately edit", isOn: Bindable(model).retractEditedEnabled)
-                Text("Selecting text and typing over it is editing, not copying — such captures are removed from history.")
+                Toggle("Ignore selections you immediately edit", isOn: Bindable(model).retractEditedEnabled)
+                Text("In editable fields Marker waits half a second before saving a selection. If you type over it in that window, nothing is captured.")
                     .settingsCaption()
             }
             Section("Paste") {

@@ -85,6 +85,15 @@ final class FakeScheduler: Scheduling {
 
     var pendingCount: Int { jobs.count }
 
+    /// Run only the first queued job (jobs it schedules stay queued).
+    func runNext() {
+        guard !jobs.isEmpty else { return }
+        let job = jobs.removeFirst()
+        if !job.token.cancelled {
+            job.action()
+        }
+    }
+
     /// Run all currently queued (and subsequently queued) jobs.
     func runAll(limit: Int = 100) {
         var steps = 0

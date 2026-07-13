@@ -104,9 +104,6 @@ final class AppModel {
         axMonitor.onKeyDown = { [weak self] isIntent, isTyping in
             self?.engine.keyDown(isSelectionIntent: isIntent, isPlainTyping: isTyping)
         }
-        engine.onRetract = { [weak self] text in
-            self?.history.retract(text: text)
-        }
         engine.retractionEnabled = retractEditedEnabled
         mouseMonitor.onMouseDown = { [weak self] in
             self?.engine.mouseDown()
