@@ -58,6 +58,7 @@ struct MarkerApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        SelfInstaller.offerMoveToApplicationsIfNeeded()
         AppModel.shared.start()
     }
 }

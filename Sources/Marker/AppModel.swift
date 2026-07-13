@@ -93,7 +93,11 @@ final class AppModel {
             Paster.copyToClipboard(text)
         }
         if isNew, toastEnabled {
-            ToastPresenter.shared.show(text: text)
+            ToastPresenter.shared.show(
+                text: text,
+                appName: app.localizedName ?? "Unknown",
+                bundleID: app.bundleIdentifier ?? ""
+            )
         }
     }
 

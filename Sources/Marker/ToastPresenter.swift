@@ -9,14 +9,16 @@ final class ToastPresenter {
     private var panel: NSPanel?
     private var hideTimer: Timer?
 
-    func show(text: String) {
+    func show(text: String, appName: String, bundleID: String) {
         let snippet = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n", with: " ")
 
-        let hosting = NSHostingView(rootView: ToastView(text: snippet))
+        let hosting = NSHostingView(
+            rootView: ToastView(text: snippet, appName: appName, bundleID: bundleID)
+        )
         var size = hosting.fittingSize
-        size.width = min(size.width, 300)
+        size.height = min(size.height, 120)
         let panel = self.panel ?? makePanel()
         panel.contentView = hosting
 
@@ -92,22 +94,32 @@ final class ToastPresenter {
 
 private struct ToastView: View {
     let text: String
+    let appName: String
+    let bundleID: String
 
     var body: some View {
-        HStack(spacing: 7) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 15, height: 15)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 14, height: 14)
+                Text("Marker")
+                    .font(.caption2.weight(.semibold))
+                Text("· copied from \(appName)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
             Text(text)
-                .font(.system(size: 12))
-                .lineLimit(1)
+                .font(.system(size: 12.5))
+                .lineLimit(3)
                 .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 6)
-        .frame(maxWidth: 280)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(width: 330, alignment: .leading)
         .toastBackground()
-        .padding(4)
+        .padding(5)
     }
 }
 
@@ -115,10 +127,10 @@ private extension View {
     @ViewBuilder
     func toastBackground() -> some View {
         if #available(macOS 26.0, *) {
-            glassEffect()
+            glassEffect(in: .rect(cornerRadius: 14))
         } else {
-            background(.regularMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(.separator.opacity(0.5)))
+            background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.separator.opacity(0.5)))
         }
     }
 }
