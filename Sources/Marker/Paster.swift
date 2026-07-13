@@ -5,17 +5,37 @@ enum Paster {
     /// system clipboard: saves the current string contents, writes `text`,
     /// synthesizes Cmd+V, then restores the original contents shortly after.
     static func pasteIntoActiveApp(_ text: String) {
+        // The hotkey is ⌥V: if Cmd+V is synthesized while the user still
+        // physically holds Option, the app receives ⌥⌘V (a different
+        // command in many apps). Wait for modifiers to clear first.
+        waitForModifierRelease(deadline: Date().addingTimeInterval(1.0)) {
+            performPaste(text)
+        }
+    }
+
+    private static func waitForModifierRelease(deadline: Date, then action: @escaping () -> Void) {
+        let held = CGEventSource.flagsState(.combinedSessionState)
+            .intersection([.maskAlternate, .maskShift, .maskControl, .maskCommand])
+        if held.isEmpty || Date() > deadline {
+            action()
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                waitForModifierRelease(deadline: deadline, then: action)
+            }
+        }
+    }
+
+    private static func performPaste(_ text: String) {
         let pasteboard = NSPasteboard.general
-        let saved = pasteboard.string(forType: .string)
+        let saved = FallbackCopier.snapshot(pasteboard)
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        markerLog.info("paste: \(text.count) chars via Cmd+V")
         postCmdV()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            guard let saved else { return }
-            pasteboard.clearContents()
-            pasteboard.setString(saved, forType: .string)
+            FallbackCopier.restore(pasteboard, from: saved)
         }
     }
 

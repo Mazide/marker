@@ -16,8 +16,8 @@ final class HotkeyManager {
             eventKind: UInt32(kEventHotKeyPressed)
         )
         let userData = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(
-            GetEventDispatcherTarget(),
+        let installErr = InstallEventHandler(
+            GetApplicationEventTarget(),
             { _, _, userData in
                 guard let userData else { return noErr }
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
@@ -31,13 +31,14 @@ final class HotkeyManager {
         )
 
         let hotKeyID = EventHotKeyID(signature: OSType(0x4D52_4B52), id: 1) // 'MRKR'
-        RegisterEventHotKey(
+        let registerErr = RegisterEventHotKey(
             UInt32(kVK_ANSI_V),
             UInt32(optionKey),
             hotKeyID,
-            GetEventDispatcherTarget(),
+            GetApplicationEventTarget(),
             0,
             &hotKeyRef
         )
+        markerLog.info("hotkey register: handler=\(installErr) hotkey=\(registerErr)")
     }
 }
