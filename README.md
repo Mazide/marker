@@ -40,6 +40,8 @@ watching selections as soon as it is granted — no relaunch needed.
   apps) may not report selections.
 - History is stored in `UserDefaults` as plain text — quit Marker before
   selecting things you don't want persisted, or use Clear.
-- The ⌥V clipboard swap restores only plain-text clipboard contents;
-  rich content (images, files) present in the clipboard at that moment
-  is not restored.
+## Privacy & license
+
+No analytics, no telemetry; the network is used only for Sparkle update
+checks. Details: [privacy policy](https://getwaymark.net/marker/privacy/).
+[MIT](LICENSE).
