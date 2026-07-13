@@ -16,11 +16,12 @@ go to the separate history only.
 - Fallback capture for apps that hide selections from Accessibility
   (Telegram, kitty, …): synthesized Cmd+C or detection of the app's own
   copy-on-select, with the previous clipboard restored afterwards.
-- Keeps the last 20 selections in a separate history (persisted across
-  restarts), with the source app and timestamp for each entry.
+- Unlimited history, grouped by day, with search and per-app filter;
+  source app icon and timestamp on every entry.
 - **⌥V** pastes the most recent selection into the active app. The system
   clipboard is briefly swapped and then restored.
 - Menu bar popover: click any history entry to copy it to the clipboard.
+- Auto-updates via Sparkle.
 
 ## Build & run
 

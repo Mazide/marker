@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Observation
+import Sparkle
 
 @Observable
 @MainActor
@@ -20,6 +21,11 @@ final class AppModel {
         didSet { UserDefaults.standard.set(copyToClipboardEnabled, forKey: "copyToClipboardEnabled") }
     }
 
+    @ObservationIgnored private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
     @ObservationIgnored private let watcher = SelectionWatcher()
     @ObservationIgnored private let hotkey = HotkeyManager()
     @ObservationIgnored private let mouseMonitor = MouseMonitor()
@@ -136,6 +142,10 @@ final class AppModel {
                 self.ingest(text: text, app: app, viaAX: false)
             }
         }
+    }
+
+    func checkForUpdates() {
+        updaterController.checkForUpdates(nil)
     }
 
     func openAccessibilitySettings() {

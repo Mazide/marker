@@ -26,27 +26,45 @@ final class ToastPresenter {
             x: visible.maxX - size.width - 12,
             y: visible.maxY - size.height - 8
         )
-        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        let finalFrame = NSRect(origin: origin, size: size)
 
-        if !panel.isVisible {
+        if panel.isVisible {
+            // Already on screen: glide to the new size/position.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(finalFrame, display: true)
+                panel.animator().alphaValue = 1
+            }
+        } else {
+            // Slide down from under the menu bar while fading in.
+            var startFrame = finalFrame
+            startFrame.origin.y += 14
+            panel.setFrame(startFrame, display: true)
             panel.alphaValue = 0
-        }
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            panel.animator().alphaValue = 1
+            panel.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.32
+                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
+                panel.animator().setFrame(finalFrame, display: true)
+                panel.animator().alphaValue = 1
+            }
         }
 
         hideTimer?.invalidate()
-        hideTimer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: false) { [weak self] _ in
+        hideTimer = Timer.scheduledTimer(withTimeInterval: 1.8, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.hide() }
         }
     }
 
     private func hide() {
         guard let panel else { return }
+        var upFrame = panel.frame
+        upFrame.origin.y += 10
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.35
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().setFrame(upFrame, display: true)
             panel.animator().alphaValue = 0
         }, completionHandler: {
             panel.orderOut(nil)
