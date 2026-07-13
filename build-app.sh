@@ -7,6 +7,13 @@ cd "$(dirname "$0")"
 swift build -c release
 
 APP=build/Marker.app
+# Overwriting the bundle under a running instance makes TCC silently drop
+# its Accessibility grant (on-disk signature no longer matches the process).
+if pgrep -xq Marker; then
+  echo "Stopping running Marker (bundle is about to be replaced)…"
+  pkill -x Marker || true
+  sleep 0.5
+fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/Marker "$APP/Contents/MacOS/Marker"
