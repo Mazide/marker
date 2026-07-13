@@ -77,9 +77,9 @@ private struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 7) {
-            Image(systemName: "highlighter")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.orange)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 15, height: 15)
             Text(text)
                 .font(.system(size: 12))
                 .lineLimit(1)

@@ -1,3 +1,5 @@
+<img src="assets/icon.svg" width="96" alt="Marker icon">
+
 # Marker
 
 Linux-style primary selection for macOS. Select text in any app — it is
