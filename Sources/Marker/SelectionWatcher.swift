@@ -16,6 +16,9 @@ final class SelectionWatcher: NSObject {
     private var lastReported: String?
     private var pendingElement: AXUIElement?
     private let systemWide = AXUIElementCreateSystemWide()
+    private var keyMonitor: Any?
+    private var lastKeyDown = Date.distantPast
+    private var lastKeyWasSelectionIntent = false
 
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -25,6 +28,21 @@ final class SelectionWatcher: NSObject {
             name: NSWorkspace.didActivateApplicationNotification,
             object: nil
         )
+        // Distinguish user selections from programmatic ones (Cmd+L
+        // selecting the URL bar, autocomplete selecting its completion):
+        // keyboard-driven selections only count when the key looked like
+        // selection intent — Shift+…, or Cmd+A.
+        if keyMonitor == nil {
+            keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return }
+                self.lastKeyDown = Date()
+                let flags = event.modifierFlags
+                // keyCode, not characters: on non-Latin layouts (RU: "ф")
+                // charactersIgnoringModifiers never matches "a".
+                let isSelectAll = flags.contains(.command) && event.keyCode == 0 // kVK_ANSI_A
+                self.lastKeyWasSelectionIntent = flags.contains(.shift) || isSelectAll
+            }
+        }
         attach(to: NSWorkspace.shared.frontmostApplication)
     }
 
@@ -113,6 +131,10 @@ final class SelectionWatcher: NSObject {
 
     private func captureSelection() {
         guard let watchedApp else { return }
+        if Date().timeIntervalSince(lastKeyDown) < 0.8, !lastKeyWasSelectionIntent {
+            markerLog.debug("skip: selection right after non-selection keystroke")
+            return
+        }
 
         // The notification's element is the most reliable source; fall back
         // to the focused element (system-wide, then per-app).
