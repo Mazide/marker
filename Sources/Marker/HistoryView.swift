@@ -14,8 +14,9 @@ struct HistoryView: View {
             footer
         }
         .frame(width: 360)
-        .tint(Color(red: 0.91, green: 0.46, blue: 0.05))
     }
+
+    static let accent = Color(red: 0.91, green: 0.46, blue: 0.05)
 
     // MARK: - Header (search + filter is the header)
 
@@ -74,7 +75,7 @@ struct HistoryView: View {
                   ? "line.3.horizontal.decrease.circle"
                   : "line.3.horizontal.decrease.circle.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(filterBundleID == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+                .foregroundStyle(filterBundleID == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Self.accent))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
