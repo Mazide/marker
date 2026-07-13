@@ -18,6 +18,12 @@ final class AppModel {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
     }
 
+    /// Classic auto-copy: captured selections also land on the system
+    /// clipboard. Off = strict X11-primary mode (history only).
+    var copyToClipboardEnabled: Bool = UserDefaults.standard.object(forKey: "copyToClipboardEnabled") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(copyToClipboardEnabled, forKey: "copyToClipboardEnabled") }
+    }
+
     @ObservationIgnored private let watcher = SelectionWatcher()
     @ObservationIgnored private let hotkey = HotkeyManager()
     @ObservationIgnored private let mouseMonitor = MouseMonitor()
@@ -79,6 +85,9 @@ final class AppModel {
         }
         let isNew = history.items.first?.text != text
         history.push(text: text, app: app)
+        if copyToClipboardEnabled {
+            Paster.copyToClipboard(text)
+        }
         if isNew, toastEnabled {
             ToastPresenter.shared.show(text: text)
         }
@@ -105,14 +114,17 @@ final class AppModel {
             // selection is already on the clipboard — take it, then put the
             // user's previous clipboard back.
             if NSPasteboard.general.changeCount != downChangeCount {
-                if let text = NSPasteboard.general.string(forType: .string),
-                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    markerLog.info("app self-copied \(text.count) chars")
-                    self.ingest(text: text, app: app, viaAX: false)
-                }
+                let text = NSPasteboard.general.string(forType: .string)
+                // Undo the app's own clipboard write first; if copy-to-
+                // clipboard is on, ingest re-writes the selection after.
                 if let snapshot = self.downSnapshot {
                     FallbackCopier.restore(NSPasteboard.general, from: snapshot)
                     self.downSnapshot = nil
+                }
+                if let text,
+                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    markerLog.info("app self-copied \(text.count) chars")
+                    self.ingest(text: text, app: app, viaAX: false)
                 }
                 return
             }

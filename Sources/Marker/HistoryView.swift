@@ -65,6 +65,8 @@ struct HistoryView: View {
     private var footer: some View {
         VStack(spacing: 6) {
             HStack(spacing: 12) {
+                Toggle("To clipboard", isOn: Bindable(model).copyToClipboardEnabled)
+                    .help("Also place every captured selection on the system clipboard (classic auto-copy). Off = history only, your clipboard stays untouched.")
                 Toggle("Fallback ⌘C", isOn: Bindable(model).fallbackCopyEnabled)
                     .help("In apps that hide selections from Accessibility (Telegram, kitty), synthesize Cmd+C on mouse-up and restore the clipboard afterwards.")
                 Toggle("Popup", isOn: Bindable(model).toastEnabled)
