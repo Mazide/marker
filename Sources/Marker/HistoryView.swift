@@ -85,14 +85,17 @@ struct HistoryView: View {
 
     // MARK: - List
 
+    private var isFiltering: Bool {
+        !searchText.isEmpty || filterBundleID != nil
+    }
+
     private var filteredItems: [SelectionItem] {
-        model.history.items.filter { item in
-            if let filterBundleID, item.bundleID != filterBundleID { return false }
-            if !searchText.isEmpty,
-               !item.text.localizedCaseInsensitiveContains(searchText),
-               !item.appName.localizedCaseInsensitiveContains(searchText) { return false }
-            return true
-        }
+        guard isFiltering else { return model.history.items }
+        // Filtered views search the whole database, not just the loaded window.
+        return model.history.search(
+            text: searchText.isEmpty ? nil : searchText,
+            bundleID: filterBundleID
+        )
     }
 
     private var dayGroups: [(day: Date, items: [SelectionItem])] {
@@ -141,6 +144,13 @@ struct HistoryView: View {
                                 HistoryRow(item: item) {
                                     model.copyToClipboard(item.text)
                                     dismiss()
+                                }
+                                .onAppear {
+                                    // Infinite scroll: reaching the oldest
+                                    // loaded row pulls the next page.
+                                    if !isFiltering, item.id == model.history.items.last?.id {
+                                        model.history.loadMore()
+                                    }
                                 }
                             }
                         } header: {

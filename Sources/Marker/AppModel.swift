@@ -9,7 +9,7 @@ import Sparkle
 final class AppModel {
     static let shared = AppModel()
 
-    let history = HistoryStore()
+    let history = HistoryStore(db: SQLiteHistoryDatabase())
     var axTrusted = AXIsProcessTrusted()
 
     var launchAtLogin: Bool = (SMAppService.mainApp.status == .enabled) {

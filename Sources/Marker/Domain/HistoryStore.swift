@@ -9,37 +9,32 @@ struct SelectionItem: Identifiable, Codable, Equatable {
     let bundleID: String
 }
 
+/// In-memory window over the history database: recent page(s) for the UI,
+/// every capture written through immediately (one INSERT, no debounce).
 @Observable
 @MainActor
 final class HistoryStore {
     private(set) var items: [SelectionItem] = []
+    private(set) var canLoadMore = false
 
     /// Refinements of the same selection gesture (double-click a word, then
     /// drag to extend) replace the previous entry within this window.
     private let refinementWindow: TimeInterval = 12
-    /// Writes are coalesced: every push marks the store dirty, the file is
-    /// written at most once per interval (plus a flush on quit).
-    private let saveDebounce: TimeInterval = 2
-    /// Soft cap so a year of heavy use doesn't grow the file unboundedly.
-    private let maxItems: Int
+    private let pageSize: Int
 
-    private let persistence: HistoryPersisting
-    private let scheduler: Scheduling
+    private let db: HistoryDatabase
     private let now: () -> Date
-    private var saveToken: SchedulerToken?
-    private var dirty = false
 
     init(
-        persistence: HistoryPersisting = FileHistoryPersistence(),
-        scheduler: Scheduling = TimerScheduler(),
-        maxItems: Int = 10_000,
+        db: HistoryDatabase,
+        pageSize: Int = 200,
         now: @escaping () -> Date = { Date() }
     ) {
-        self.persistence = persistence
-        self.scheduler = scheduler
-        self.maxItems = maxItems
+        self.db = db
+        self.pageSize = pageSize
         self.now = now
-        items = persistence.load()
+        items = db.recent(limit: pageSize, offset: 0)
+        canLoadMore = db.count() > items.count
     }
 
     func push(text rawText: String, app: SourceApp) {
@@ -51,6 +46,7 @@ final class HistoryStore {
            now().timeIntervalSince(first.date) < refinementWindow,
            text.contains(first.text) || first.text.contains(text) {
             items.removeFirst()
+            db.delete(id: first.id)
         }
 
         let item = SelectionItem(
@@ -61,74 +57,32 @@ final class HistoryStore {
             bundleID: app.bundleID
         )
         items.removeAll { $0.text == text }
+        db.deleteAll(text: text)
         items.insert(item, at: 0)
-        if items.count > maxItems {
-            items.removeLast(items.count - maxItems)
-        }
-        scheduleSave()
+        db.insert(item)
+    }
+
+    /// Append the next page of older entries to the in-memory window.
+    func loadMore() {
+        guard canLoadMore else { return }
+        let more = db.recent(limit: pageSize, offset: items.count)
+        items.append(contentsOf: more)
+        canLoadMore = more.count == pageSize
+    }
+
+    /// Search the whole database, not just the loaded window.
+    func search(text: String?, bundleID: String?) -> [SelectionItem] {
+        db.query(text: text, bundleID: bundleID, limit: 500)
     }
 
     func clear() {
         items = []
-        flush(force: true)
+        canLoadMore = false
+        db.clear()
     }
 
-    /// Write pending changes now (app quit, store deallocation).
-    func flush(force: Bool = false) {
-        saveToken?.cancel()
-        saveToken = nil
-        guard dirty || force else { return }
-        dirty = false
-        persistence.save(items)
-    }
-
-    private func scheduleSave() {
-        dirty = true
-        guard saveToken == nil else { return }
-        saveToken = scheduler.schedule(after: saveDebounce) { [weak self] in
-            self?.flush()
-        }
-    }
-
-    /// Unique source apps present in the history, ordered by name.
+    /// Unique source apps across the whole history, ordered by name.
     var apps: [(bundleID: String, name: String)] {
-        var seen = Set<String>()
-        var result: [(String, String)] = []
-        for item in items where !item.bundleID.isEmpty && seen.insert(item.bundleID).inserted {
-            result.append((item.bundleID, item.appName))
-        }
-        return result.sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
-    }
-}
-
-/// JSON file in Application Support, with one-time migration from the
-/// pre-0.2 UserDefaults key.
-final class FileHistoryPersistence: HistoryPersisting {
-    private let legacyDefaultsKey = "selectionHistory"
-    private let fileURL: URL = {
-        let dir = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Marker", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("history.json")
-    }()
-
-    func load() -> [SelectionItem] {
-        if let data = try? Data(contentsOf: fileURL),
-           let saved = try? JSONDecoder().decode([SelectionItem].self, from: data) {
-            return saved
-        }
-        if let data = UserDefaults.standard.data(forKey: legacyDefaultsKey),
-           let saved = try? JSONDecoder().decode([SelectionItem].self, from: data) {
-            UserDefaults.standard.removeObject(forKey: legacyDefaultsKey)
-            save(saved)
-            return saved
-        }
-        return []
-    }
-
-    func save(_ items: [SelectionItem]) {
-        guard let data = try? JSONEncoder().encode(items) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        db.apps()
     }
 }

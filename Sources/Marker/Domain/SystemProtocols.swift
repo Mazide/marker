@@ -44,7 +44,14 @@ protocol Scheduling: AnyObject {
     func schedule(after seconds: TimeInterval, _ action: @escaping () -> Void) -> SchedulerToken
 }
 
-protocol HistoryPersisting {
-    func load() -> [SelectionItem]
-    func save(_ items: [SelectionItem])
+protocol HistoryDatabase: AnyObject {
+    func insert(_ item: SelectionItem)
+    func delete(id: UUID)
+    func deleteAll(text: String)
+    func clear()
+    func recent(limit: Int, offset: Int) -> [SelectionItem]
+    /// Case-insensitive search over text and app name, newest first.
+    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem]
+    func apps() -> [(bundleID: String, name: String)]
+    func count() -> Int
 }

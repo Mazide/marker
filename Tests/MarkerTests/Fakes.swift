@@ -96,12 +96,42 @@ final class FakeScheduler: Scheduling {
     }
 }
 
-final class InMemoryPersistence: HistoryPersisting {
-    var stored: [SelectionItem] = []
-    private(set) var saveCount = 0
-    func load() -> [SelectionItem] { stored }
-    func save(_ items: [SelectionItem]) {
-        stored = items
-        saveCount += 1
+final class InMemoryHistoryDatabase: HistoryDatabase {
+    private(set) var rows: [SelectionItem] = []
+
+    func insert(_ item: SelectionItem) {
+        rows.removeAll { $0.id == item.id }
+        rows.append(item)
+        rows.sort { $0.date > $1.date }
     }
+
+    func delete(id: UUID) { rows.removeAll { $0.id == id } }
+    func deleteAll(text: String) { rows.removeAll { $0.text == text } }
+    func clear() { rows = [] }
+
+    func recent(limit: Int, offset: Int) -> [SelectionItem] {
+        Array(rows.dropFirst(offset).prefix(limit))
+    }
+
+    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem] {
+        rows.filter { row in
+            if let bundleID, row.bundleID != bundleID { return false }
+            if let text,
+               !row.text.lowercased().contains(text.lowercased()),
+               !row.appName.lowercased().contains(text.lowercased()) { return false }
+            return true
+        }
+        .prefix(limit).map { $0 }
+    }
+
+    func apps() -> [(bundleID: String, name: String)] {
+        var seen = Set<String>()
+        var result: [(String, String)] = []
+        for row in rows where !row.bundleID.isEmpty && seen.insert(row.bundleID).inserted {
+            result.append((row.bundleID, row.appName))
+        }
+        return result.sorted { $0.1.lowercased() < $1.1.lowercased() }
+    }
+
+    func count() -> Int { rows.count }
 }
