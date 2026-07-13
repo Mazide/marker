@@ -38,8 +38,9 @@ watching selections as soon as it is granted — no relaunch needed.
 
 - Apps with poor Accessibility support (some Electron apps, some Java
   apps) may not report selections.
-- History is stored in `UserDefaults` as plain text — quit Marker before
-  selecting things you don't want persisted, or use Clear.
+- History is stored unencrypted in a local SQLite database
+  (`~/Library/Application Support/Marker`). Use Clear for anything you
+  don't want persisted; nothing ever leaves your Mac.
 ## Privacy & license
 
 No analytics, no telemetry; the network is used only for Sparkle update
