@@ -15,7 +15,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 # Sign with a real identity: ad-hoc signatures change cdhash on every
 # rebuild, which silently revokes the Accessibility (TCC) grant.
 IDENTITY="${MARKER_SIGN_IDENTITY:-Developer ID Application}"
-codesign --force --options runtime --sign "$IDENTITY" "$APP"
+codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
 
 echo "Built $APP"
 echo "Run: open $APP"
