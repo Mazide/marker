@@ -17,15 +17,27 @@ final class HistoryStore {
     /// Refinements of the same selection gesture (double-click a word, then
     /// drag to extend) replace the previous entry within this window.
     private let refinementWindow: TimeInterval = 12
+    /// Writes are coalesced: every push marks the store dirty, the file is
+    /// written at most once per interval (plus a flush on quit).
+    private let saveDebounce: TimeInterval = 2
+    /// Soft cap so a year of heavy use doesn't grow the file unboundedly.
+    private let maxItems: Int
 
     private let persistence: HistoryPersisting
+    private let scheduler: Scheduling
     private let now: () -> Date
+    private var saveToken: SchedulerToken?
+    private var dirty = false
 
     init(
         persistence: HistoryPersisting = FileHistoryPersistence(),
+        scheduler: Scheduling = TimerScheduler(),
+        maxItems: Int = 10_000,
         now: @escaping () -> Date = { Date() }
     ) {
         self.persistence = persistence
+        self.scheduler = scheduler
+        self.maxItems = maxItems
         self.now = now
         items = persistence.load()
     }
@@ -50,12 +62,32 @@ final class HistoryStore {
         )
         items.removeAll { $0.text == text }
         items.insert(item, at: 0)
-        persistence.save(items)
+        if items.count > maxItems {
+            items.removeLast(items.count - maxItems)
+        }
+        scheduleSave()
     }
 
     func clear() {
         items = []
+        flush(force: true)
+    }
+
+    /// Write pending changes now (app quit, store deallocation).
+    func flush(force: Bool = false) {
+        saveToken?.cancel()
+        saveToken = nil
+        guard dirty || force else { return }
+        dirty = false
         persistence.save(items)
+    }
+
+    private func scheduleSave() {
+        dirty = true
+        guard saveToken == nil else { return }
+        saveToken = scheduler.schedule(after: saveDebounce) { [weak self] in
+            self?.flush()
+        }
     }
 
     /// Unique source apps present in the history, ordered by name.

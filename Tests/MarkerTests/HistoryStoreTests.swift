@@ -4,6 +4,7 @@ import XCTest
 @MainActor
 final class HistoryStoreTests: XCTestCase {
     private var persistence: InMemoryPersistence!
+    private var scheduler: FakeScheduler!
     private var store: HistoryStore!
     private var clock: Date!
 
@@ -12,8 +13,13 @@ final class HistoryStoreTests: XCTestCase {
 
     override func setUp() async throws {
         persistence = InMemoryPersistence()
+        scheduler = FakeScheduler()
         clock = Date(timeIntervalSince1970: 1_000_000)
-        store = HistoryStore(persistence: persistence, now: { [unowned self] in self.clock })
+        store = HistoryStore(
+            persistence: persistence,
+            scheduler: scheduler,
+            now: { [unowned self] in self.clock }
+        )
     }
 
     func testTrimsAndDedupesWhitespaceVariants() {
@@ -82,8 +88,42 @@ final class HistoryStoreTests: XCTestCase {
 
     func testPersistsAcrossInstances() {
         store.push(text: "persisted", app: telegram)
+        store.flush()
         let reloaded = HistoryStore(persistence: persistence, now: { self.clock })
 
         XCTAssertEqual(reloaded.items.map(\.text), ["persisted"])
+    }
+
+    func testSavesAreDebounced() {
+        for i in 0..<5 {
+            store.push(text: "item \(i)", app: telegram)
+            clock = clock.addingTimeInterval(60)
+        }
+        XCTAssertEqual(persistence.saveCount, 0, "no write until debounce fires")
+
+        scheduler.runAll()
+        XCTAssertEqual(persistence.saveCount, 1, "burst of pushes coalesces into one write")
+        XCTAssertEqual(persistence.stored.count, 5)
+    }
+
+    func testFlushWithoutChangesDoesNotWrite() {
+        store.flush()
+        XCTAssertEqual(persistence.saveCount, 0)
+    }
+
+    func testHistoryIsCappedAtMaxItems() {
+        let capped = HistoryStore(
+            persistence: InMemoryPersistence(),
+            scheduler: scheduler,
+            maxItems: 3,
+            now: { self.clock }
+        )
+        for i in 0..<5 {
+            capped.push(text: "item \(i)", app: telegram)
+            clock = clock.addingTimeInterval(60)
+        }
+
+        XCTAssertEqual(capped.items.count, 3)
+        XCTAssertEqual(capped.items.first?.text, "item 4", "newest survives")
     }
 }

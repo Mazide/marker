@@ -98,6 +98,10 @@ final class FakeScheduler: Scheduling {
 
 final class InMemoryPersistence: HistoryPersisting {
     var stored: [SelectionItem] = []
+    private(set) var saveCount = 0
     func load() -> [SelectionItem] { stored }
-    func save(_ items: [SelectionItem]) { stored = items }
+    func save(_ items: [SelectionItem]) {
+        stored = items
+        saveCount += 1
+    }
 }
