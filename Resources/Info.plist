@@ -13,9 +13,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.5</string>
+	<string>0.2.6</string>
 	<key>CFBundleVersion</key>
-	<string>10</string>
+	<string>11</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
@@ -25,7 +25,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://getwaymark.net/marker/appcast.xml</string>
+	<string>https://getmarkerapp.net/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>Xv71Cq8bZRVJG6hlgfdV6nqJ2ap7ppnGn9lbubi6Ts4=</string>
 </dict>

@@ -21,8 +21,8 @@ mkdir -p "$OUT"
 cp "$DMG" "$OUT/marker-$VERSION-$BUILD.dmg"
 
 "$GENERATE_APPCAST" \
-  --download-url-prefix "https://getwaymark.net/marker/" \
-  --link "https://getwaymark.net/marker/" \
+  --download-url-prefix "https://getmarkerapp.net/" \
+  --link "https://getmarkerapp.net/" \
   --maximum-versions 5 \
   "$OUT"
 

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marker: select text, it's already copied</title>
+  <meta name="description" content="Tiny macOS menu bar app: selected text is captured automatically into a searchable history, and Option+V pastes the latest. Free, open source, notarized.">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: #f6f3ee;
+      color: #181714;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+    }
+
+    main {
+      width: min(520px, 100%);
+    }
+
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .hero img {
+      width: 88px;
+      height: 88px;
+      border-radius: 20px;
+      box-shadow: 0 6px 18px rgba(24, 23, 20, 0.18);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 40px;
+      line-height: 1;
+    }
+
+    .tagline {
+      margin: 6px 0 0;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #33302b;
+      font-weight: 550;
+    }
+
+    ul.how {
+      margin: 0 0 28px;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+
+    ul.how li {
+      font-size: 16px;
+      line-height: 1.5;
+      color: #555049;
+      padding-left: 22px;
+      position: relative;
+    }
+
+    ul.how li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.62em;
+      width: 10px;
+      height: 3px;
+      border-radius: 2px;
+      background: #e8930c;
+    }
+
+    kbd {
+      font-family: inherit;
+      font-size: 14px;
+      padding: 1px 6px;
+      border-radius: 5px;
+      border: 1px solid #d8d2c7;
+      background: #fffdf9;
+      color: #33302b;
+      white-space: nowrap;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    a.primary {
+      background: #181714;
+      color: #f6f3ee;
+    }
+
+    a.secondary {
+      background: transparent;
+      color: #181714;
+      border: 1.5px solid #c9c1b2;
+    }
+
+    .meta {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #8a8378;
+    }
+
+    .quiet {
+      margin-top: 24px;
+      font-size: 14px;
+      color: #8a8378;
+    }
+
+    .quiet a {
+      color: inherit;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        background: #14120f;
+        color: #f3efe8;
+      }
+
+      .tagline {
+        color: #e6dfd3;
+      }
+
+      ul.how li {
+        color: #c9c1b5;
+      }
+
+      kbd {
+        border-color: #3a3731;
+        background: #201e1b;
+        color: #e6dfd3;
+      }
+
+      a.primary {
+        background: #f3efe8;
+        color: #181714;
+      }
+
+      a.secondary {
+        color: #f3efe8;
+        border-color: #4a453c;
+      }
+
+      .meta,
+      .quiet {
+        color: #9f978c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="hero">
+      <img src="/icon.svg" alt="">
+      <div>
+        <h1>Marker</h1>
+        <p class="tagline">Select text. It's already copied.</p>
+      </div>
+    </div>
+    <ul class="how">
+      <li>Works system-wide: native apps, browsers, Telegram, terminals.</li>
+      <li>Selected text goes straight to your clipboard, ready to <kbd>⌘ V</kbd>. Prefer your clipboard untouched? Turn that off: selections stay inside Marker, and <kbd>⌥ V</kbd> pastes the latest.</li>
+      <li>Selected something yesterday and lost it? It's still in the menu bar: search it or browse by app.</li>
+    </ul>
+    <div class="buttons">
+      <a class="btn primary" href="/marker-0.2.5-10.dmg">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="margin-top:-2px"><path fill="currentColor" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.03 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.56-1.702"/></svg>
+        Download for macOS
+      </a>
+      <a class="btn secondary" href="https://github.com/Mazide/marker">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.4.6.1.82-.26.82-.58v-2.02c-3.34.72-4.04-1.6-4.04-1.6-.55-1.4-1.34-1.76-1.34-1.76-1.08-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.9 1.23 3.22 0 4.6-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.57C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+    <div class="meta">0.2.5 · macOS 14+ · Free · Notarized</div>
+    <p class="quiet">
+      Needs Accessibility permission. Nothing leaves your Mac
+      (<a href="/privacy/">privacy</a>). MIT-licensed.
+      Questions: <a href="mailto:nikdemm@gmail.com?subject=Marker">email</a> or GitHub issues.
+      From the same desk as <a href="https://getwaymark.net/">waymark</a>.
+    </p>
+  </main>
+</body>
+</html>

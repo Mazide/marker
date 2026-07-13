@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marker Privacy</title>
+  <meta name="description" content="Marker privacy policy: no tracking, no analytics, everything stays on your Mac.">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: #f6f3ee;
+      color: #181714;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+    }
+
+    main {
+      width: min(560px, 100%);
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 32px;
+      line-height: 1.1;
+    }
+
+    .updated {
+      margin: 0 0 24px;
+      font-size: 14px;
+      color: #8a8378;
+    }
+
+    h2 {
+      margin: 24px 0 8px;
+      font-size: 18px;
+    }
+
+    p {
+      margin: 0 0 12px;
+      font-size: 16px;
+      line-height: 1.55;
+      color: #555049;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .back {
+      display: inline-block;
+      margin-top: 28px;
+      font-size: 14px;
+      color: #8a8378;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        background: #14120f;
+        color: #f3efe8;
+      }
+
+      p {
+        color: #c9c1b5;
+      }
+
+      .updated,
+      .back {
+        color: #9f978c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Marker Privacy Policy</h1>
+    <p class="updated">Last updated: July 13, 2026</p>
+
+    <h2>The short version</h2>
+    <p>
+      Marker collects nothing. There are no analytics, no telemetry, no
+      accounts, no ads, and no third-party SDKs that phone home.
+    </p>
+
+    <h2>Your selections and clipboard</h2>
+    <p>
+      Text you select is stored only on your Mac, in a local file
+      (<code>~/Library/Application&nbsp;Support/Marker</code>). It is never
+      transmitted anywhere. Deleting the app or pressing Clear removes it.
+    </p>
+
+    <h2>Accessibility permission</h2>
+    <p>
+      Marker asks for macOS Accessibility access solely to read the text you
+      select and to paste on your behalf. That access is used for nothing
+      else.
+    </p>
+
+    <h2>Network</h2>
+    <p>
+      Marker connects to the internet for exactly one thing: checking for app
+      updates via the standard Sparkle framework against
+      <a href="https://getmarkerapp.net/">getmarkerapp.net</a>. An update
+      check is a plain HTTPS request; like any web request it exposes your IP
+      address and app version to the server, which we don't log or profile.
+      No other network requests are made.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      If this policy ever changes, the update will be published on this page.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions? Open an issue on
+      <a href="https://github.com/Mazide/marker">GitHub</a> or email
+      <a href="mailto:nikdemm@gmail.com?subject=Marker">nikdemm@gmail.com</a>.
+    </p>
+
+    <a class="back" href="/">← Marker</a>
+  </main>
+</body>
+</html>
