@@ -118,6 +118,7 @@ final class InMemoryHistoryDatabase: HistoryDatabase {
 
     func delete(id: UUID) { rows.removeAll { $0.id == id } }
     func deleteAll(text: String) { rows.removeAll { $0.text == text } }
+    func deleteOlderThan(_ date: Date) { rows.removeAll { $0.date < date } }
     func clear() { rows = [] }
 
     func recent(limit: Int, offset: Int) -> [SelectionItem] {

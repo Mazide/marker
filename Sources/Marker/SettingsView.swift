@@ -72,6 +72,12 @@ private struct GeneralSettingsView: View {
             }
 
             Section("History") {
+                Picker("Keep history for", selection: Bindable(model).historyRetentionDays) {
+                    Text("Forever").tag(0)
+                    Text("7 days").tag(7)
+                    Text("30 days").tag(30)
+                    Text("90 days").tag(90)
+                }
                 LabeledContent("Remove every captured selection") {
                     Button("Clear History…", role: .destructive) {
                         model.history.clear()

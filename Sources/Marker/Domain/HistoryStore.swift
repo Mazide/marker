@@ -67,6 +67,16 @@ final class HistoryStore {
         db.delete(id: item.id)
     }
 
+    /// Drop everything older than `days` (retention setting). `days <= 0`
+    /// means "keep forever" and is a no-op.
+    func applyRetention(days: Int) {
+        guard days > 0 else { return }
+        let cutoff = now().addingTimeInterval(-Double(days) * 86400)
+        items.removeAll { $0.date < cutoff }
+        db.deleteOlderThan(cutoff)
+        canLoadMore = db.count() > items.count
+    }
+
     /// Append the next page of older entries to the in-memory window.
     func loadMore() {
         guard canLoadMore else { return }

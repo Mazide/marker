@@ -73,6 +73,13 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
         }
     }
 
+    func deleteOlderThan(_ date: Date) {
+        withStatement("DELETE FROM items WHERE date < ?") { statement in
+            sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
+            sqlite3_step(statement)
+        }
+    }
+
     func clear() {
         exec("DELETE FROM items")
     }

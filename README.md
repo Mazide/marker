@@ -16,8 +16,9 @@ go to the separate history only.
 - Fallback capture for apps that hide selections from Accessibility
   (Telegram, kitty, …): synthesized Cmd+C or detection of the app's own
   copy-on-select, with the previous clipboard restored afterwards.
-- Unlimited history, grouped by day, with search and per-app filter;
-  source app icon and timestamp on every entry.
+- Unlimited history by default, grouped by day, with search and per-app
+  filter; source app icon and timestamp on every entry. Optional
+  auto-expiry (7/30/90 days) in Settings → History.
 - **⌥V** pastes the most recent selection into the active app. The system
   clipboard is briefly swapped and then restored.
 - Menu bar popover: click any history entry to copy it to the clipboard.

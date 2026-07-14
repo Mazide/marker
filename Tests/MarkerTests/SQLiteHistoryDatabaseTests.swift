@@ -75,6 +75,16 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["keep"])
     }
 
+    func testDeleteOlderThanCutoff() {
+        db.insert(item("old", offset: 0))
+        db.insert(item("new", offset: 100))
+
+        db.deleteOlderThan(Date(timeIntervalSince1970: 1_000_000 + 50))
+
+        XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["new"])
+        XCTAssertEqual(db.count(), 1)
+    }
+
     func testAppsAreDistinct() {
         db.insert(item("a", offset: 0))
         db.insert(item("b", offset: 1))

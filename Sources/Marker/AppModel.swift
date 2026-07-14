@@ -66,6 +66,15 @@ final class AppModel {
         didSet { UserDefaults.standard.set(skipSecretsEnabled, forKey: "skipSecretsEnabled") }
     }
 
+    /// 0 = keep forever (default: history is unencrypted on disk, see README,
+    /// so this is opt-in, not a silent default).
+    var historyRetentionDays: Int = UserDefaults.standard.object(forKey: "historyRetentionDays") as? Int ?? 0 {
+        didSet {
+            UserDefaults.standard.set(historyRetentionDays, forKey: "historyRetentionDays")
+            history.applyRetention(days: historyRetentionDays)
+        }
+    }
+
     // System layer
     @ObservationIgnored private let pasteboard = SystemPasteboard()
     @ObservationIgnored private let keys = CGEventKeySynthesizer()
@@ -82,6 +91,7 @@ final class AppModel {
         userDriverDelegate: nil
     )
     @ObservationIgnored private var trustPollTimer: Timer?
+    @ObservationIgnored private var retentionTimer: Timer?
 
     // Domain layer
     @ObservationIgnored private var engine: CaptureEngine!
@@ -144,6 +154,14 @@ final class AppModel {
             trackpadTap.start()
         }
         hotkey.register()
+
+        history.applyRetention(days: historyRetentionDays)
+        retentionTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.history.applyRetention(days: self.historyRetentionDays)
+            }
+        }
 
         // First run from /Applications: start at login by default (the
         // system notifies the user; the toggle can turn it off). Dev builds

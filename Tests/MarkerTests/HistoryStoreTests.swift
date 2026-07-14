@@ -133,4 +133,44 @@ extension HistoryStoreTests {
         XCTAssertEqual(store.items.map(\.text), ["keep"])
         XCTAssertEqual(db.count(), 1)
     }
+
+    func testApplyRetentionDropsOlderEntriesFromStoreAndDatabase() {
+        store.push(text: "ancient", app: telegram)
+        clock = clock.addingTimeInterval(30 * 86400)
+        store.push(text: "recent", app: telegram)
+
+        store.applyRetention(days: 7)
+
+        XCTAssertEqual(store.items.map(\.text), ["recent"])
+        XCTAssertEqual(db.count(), 1)
+    }
+
+    func testApplyRetentionZeroDaysKeepsEverything() {
+        store.push(text: "ancient", app: telegram)
+        clock = clock.addingTimeInterval(365 * 86400)
+        store.push(text: "recent", app: telegram)
+
+        store.applyRetention(days: 0)
+
+        XCTAssertEqual(store.items.count, 2)
+        XCTAssertEqual(db.count(), 2)
+    }
+
+    func testApplyRetentionUpdatesCanLoadMore() {
+        for i in 0..<5 {
+            db.insert(SelectionItem(
+                id: UUID(), text: "old \(i)",
+                date: clock.addingTimeInterval(Double(i)),
+                appName: "Telegram", bundleID: "org.telegram"
+            ))
+        }
+        clock = clock.addingTimeInterval(30 * 86400)
+        let paged = HistoryStore(db: db, pageSize: 2, now: { self.clock })
+        XCTAssertTrue(paged.canLoadMore)
+
+        paged.applyRetention(days: 7)
+
+        XCTAssertEqual(db.count(), 0)
+        XCTAssertFalse(paged.canLoadMore)
+    }
 }

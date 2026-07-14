@@ -50,6 +50,7 @@ protocol HistoryDatabase: AnyObject {
     func insert(_ item: SelectionItem)
     func delete(id: UUID)
     func deleteAll(text: String)
+    func deleteOlderThan(_ date: Date)
     func clear()
     func recent(limit: Int, offset: Int) -> [SelectionItem]
     /// Case-insensitive search over text and app name, newest first.
