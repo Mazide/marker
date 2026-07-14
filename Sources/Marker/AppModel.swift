@@ -120,8 +120,8 @@ final class AppModel {
             self?.engine.keyDown(isSelectionIntent: isIntent, isPlainTyping: isTyping)
         }
         engine.retractionEnabled = retractEditedEnabled
-        mouseMonitor.onMouseDown = { [weak self] in
-            self?.engine.mouseDown()
+        mouseMonitor.onMouseDown = { [weak self] shiftClick in
+            self?.engine.mouseDown(shiftClick: shiftClick)
         }
         mouseMonitor.onSelectionGesture = { [weak self] in
             self?.engine.selectionGesture()
