@@ -17,6 +17,10 @@ final class CaptureEngine {
         /// typing within the window means select-to-edit and the capture is
         /// silently dropped (no toast, no history churn).
         var commitDelay: TimeInterval = 0.5
+        /// After a mouse gesture captured, AX notifications are ignored for
+        /// this long: a focused text field re-reporting its old selection
+        /// during a drag elsewhere (Telegram) must not clobber the capture.
+        var notificationQuiet: TimeInterval = 1.0
     }
 
     /// Element roles where a drag is not a text selection.
@@ -47,6 +51,15 @@ final class CaptureEngine {
     private var axProvenApps: Set<String> = []
     private var downChangeCount = 0
     private var downSnapshot: PasteboardSnapshot?
+    private var downSelection: String?
+    private var lastGestureCapture = Date.distantPast
+    /// Ring of recently captured texts. Focused text fields re-report
+    /// their old selection whenever the user clicks elsewhere in the app
+    /// (Telegram's input box) — that text was captured when originally
+    /// selected, so a notification matching the ring is a re-report, not
+    /// a user selection.
+    private var recentCaptures: [String] = []
+    private let recentCapturesLimit = 12
 
     private struct PendingCommit {
         let text: String
@@ -105,6 +118,12 @@ final class CaptureEngine {
     func mouseDown() {
         downChangeCount = pasteboard.changeCount
         downSnapshot = nil
+        // A selection produced by this gesture must differ from whatever
+        // the focused element reported before it: a focused text field
+        // keeps reporting its old selection while the user drags in an
+        // AX-blind part of the app (Telegram input box vs. message list).
+        downSelection = selection.currentSelection()?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let app = frontmost.frontmostApp(), !app.isSelf,
               !axProvenApps.contains(app.bundleID)
         else { return }
@@ -131,17 +150,35 @@ final class CaptureEngine {
             markerLog.debug("skip: selection right after non-selection keystroke")
             return
         }
+        if now().timeIntervalSince(lastGestureCapture) < config.notificationQuiet {
+            markerLog.debug("skip: notification right after a gesture capture")
+            return
+        }
         guard let app = frontmost.frontmostApp(), !app.isSelf,
               let text = selection.currentSelection()
         else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !recentCaptures.contains(trimmed) else {
+            markerLog.info("skip: re-reported selection (\(trimmed.count) chars)")
+            return
+        }
         capture(text, app: app, viaAX: true)
     }
 
     private func resolveGesture(app: SourceApp, downCount: Int) {
-        if let text = selection.currentSelection(),
-           !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            capture(text, app: app, viaAX: true)
-            return
+        // Trust the AX read only when this gesture changed it; an AX text
+        // identical to the mouse-down snapshot is a focused field's old
+        // selection, not the drag's result. Stale or deduped: keep going —
+        // the fallback paths see the real selection.
+        if let text = selection.currentSelection() {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, trimmed != downSelection,
+               captureFromGesture(text, app: app, viaAX: true) {
+                return
+            }
+            if trimmed == downSelection {
+                markerLog.info("gesture: AX text unchanged since mouse-down, trying fallback")
+            }
         }
         guard !axProvenApps.contains(app.bundleID) else { return }
 
@@ -156,7 +193,7 @@ final class CaptureEngine {
             }
             if let text {
                 markerLog.info("app self-copied \(text.count) chars")
-                capture(text, app: app, viaAX: false)
+                captureFromGesture(text, app: app, viaAX: false)
             }
             return
         }
@@ -187,7 +224,7 @@ final class CaptureEngine {
                 self.pasteboard.restore(saved)
                 if let text {
                     markerLog.info("fallback captured \(text.count) chars")
-                    self.capture(text, app: app, viaAX: false)
+                    self.captureFromGesture(text, app: app, viaAX: false)
                 }
             } else if attemptsLeft > 0 {
                 self.poll(app: app, before: before, saved: saved, attemptsLeft: attemptsLeft - 1)
@@ -198,18 +235,41 @@ final class CaptureEngine {
         }
     }
 
-    private func capture(_ rawText: String, app: SourceApp, viaAX: Bool) {
+    /// Gesture-path capture: on success, AX notifications are silenced for
+    /// notificationQuiet so a stale re-report cannot clobber this capture.
+    @discardableResult
+    private func captureFromGesture(_ text: String, app: SourceApp, viaAX: Bool) -> Bool {
+        guard capture(text, app: app, viaAX: viaAX) else { return false }
+        lastGestureCapture = now()
+        return true
+    }
+
+    /// Returns false when the text was empty or a duplicate of the last
+    /// capture — the caller may then try other capture paths.
+    @discardableResult
+    private func capture(_ rawText: String, app: SourceApp, viaAX: Bool) -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text != lastReported else { return }
+        guard !text.isEmpty, text != lastReported else { return false }
         lastReported = text
-        if viaAX, !app.bundleID.isEmpty {
+        recentCaptures.removeAll { $0 == text }
+        recentCaptures.append(text)
+        if recentCaptures.count > recentCapturesLimit {
+            recentCaptures.removeFirst()
+        }
+
+        let editable = MiddlePastePolicy.shouldPaste(role: selection.focusedElementRole())
+
+        // An AX capture proves the app only when it came from the app's
+        // content, not an editable field. Hybrid apps (Telegram) expose
+        // their input box to AX but hide the message list — a capture from
+        // the input box must not disable the Cmd+C fallback for the list.
+        if viaAX, !editable, !app.bundleID.isEmpty {
             axProvenApps.insert(app.bundleID)
         }
 
         // Editable fields: hold the commit briefly. Typing in the window
         // cancels it (select-to-edit); silence commits it. Fallback
         // (terminal) captures and read-only contexts commit instantly.
-        let editable = MiddlePastePolicy.shouldPaste(role: selection.focusedElementRole())
         if retractionEnabled, viaAX, editable {
             pendingCommit?.token.cancel()
             let token = scheduler.schedule(after: config.commitDelay) { [weak self] in
@@ -221,6 +281,7 @@ final class CaptureEngine {
         } else {
             commit(text, app: app, viaAX: viaAX)
         }
+        return true
     }
 
     private func commit(_ text: String, app: SourceApp, viaAX: Bool) {

@@ -36,8 +36,8 @@ final class CaptureEngineTests: XCTestCase {
     // MARK: - Gesture: AX-first
 
     func testGestureCapturesAXSelection() {
-        reader.selection = "  hello world \n"
         engine.mouseDown()
+        reader.selection = "  hello world \n" // selected during the drag
         engine.selectionGesture()
         scheduler.runAll()
 
@@ -49,8 +49,8 @@ final class CaptureEngineTests: XCTestCase {
 
     func testEmptyAXInProvenAppNeverFallsBack() {
         // Prove AX support first.
-        reader.selection = "first"
         engine.mouseDown()
+        reader.selection = "first"
         engine.selectionGesture()
         scheduler.runAll()
 
@@ -62,6 +62,180 @@ final class CaptureEngineTests: XCTestCase {
 
         XCTAssertEqual(captures.count, 1)
         XCTAssertEqual(keys.copyCount, 0, "proven-AX app must not trigger Cmd+C")
+    }
+
+    func testEditableFieldCaptureDoesNotDisableFallback() {
+        // Hybrid app (Telegram): the input box is AX-visible, the message
+        // list is not. A capture from the input box must not mark the app
+        // AX-proven, or list selections lose the Cmd+C fallback.
+        engine.mouseDown()
+        reader.selection = "typed draft"
+        reader.focusedRole = "AXTextArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+        XCTAssertEqual(captures.count, 1)
+
+        // Selection in the AX-blind message list.
+        reader.selection = nil
+        reader.focusedRole = nil
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message text")
+        }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 1, "fallback must survive an input-box capture")
+        XCTAssertEqual(captures.map(\.text), ["typed draft", "message text"])
+    }
+
+    func testStaleFocusedFieldSelectionDoesNotShadowFallback() {
+        // The input box keeps focus and keeps reporting its old selection
+        // while the user drags in the AX-blind message list. The stale
+        // (deduped) AX read must fall through to the Cmd+C fallback.
+        engine.mouseDown()
+        reader.selection = "draft"
+        reader.focusedRole = "AXTextArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+        XCTAssertEqual(captures.map(\.text), ["draft"])
+
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message text")
+        }
+        engine.mouseDown()
+        engine.selectionGesture() // AX still reports "draft"
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 1, "stale AX text must not block the fallback")
+        XCTAssertEqual(captures.map(\.text), ["draft", "message text"])
+    }
+
+    func testStaleNotificationAfterGestureCaptureIsSuppressed() {
+        // Dragging in the AX-blind list triggers the input box to re-report
+        // its old selection; the debounced notification lands right after
+        // the fallback capture and must not clobber it.
+        engine.mouseDown()
+        reader.selection = "old input text"
+        reader.focusedRole = "AXTextArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message text")
+        }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll() // fallback captures the list selection
+
+        // The input box re-reported during the drag; the debounced
+        // notification lands after the fallback capture.
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertEqual(
+            captures.map(\.text), ["old input text", "message text"],
+            "the stale notification must not re-capture the input text")
+
+        // A genuinely new selection after the quiet window still lands.
+        clock = clock.addingTimeInterval(2)
+        reader.selection = "fresh keyboard selection"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+        XCTAssertEqual(captures.last?.text, "fresh keyboard selection")
+    }
+
+    func testLateReReportedSelectionIsSuppressed() {
+        // Clicking around the app makes the focused input re-report its
+        // old selection long after the quiet window; only a changed text
+        // counts as a user selection.
+        reader.selection = "old input text"
+        reader.focusedRole = "AXTextArea"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+        XCTAssertEqual(captures.map(\.text), ["old input text"])
+
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message text")
+        }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+        XCTAssertEqual(captures.map(\.text), ["old input text", "message text"])
+
+        // Same stale text re-reported seconds later.
+        clock = clock.addingTimeInterval(3)
+        engine.axSelectionChanged()
+        scheduler.runAll()
+        XCTAssertEqual(captures.count, 2, "re-report must not clobber the capture")
+
+        // A genuinely new selection in the input still lands.
+        reader.selection = "new input text"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+        XCTAssertEqual(captures.last?.text, "new input text")
+
+        // The old stale text keeps coming back after new captures land in
+        // between; it stays suppressed (recent-captures ring, not a
+        // single-slot memory).
+        clock = clock.addingTimeInterval(3)
+        reader.selection = "old input text"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+        XCTAssertEqual(
+            captures.last?.text, "new input text",
+            "a re-report of any recently captured text must be suppressed")
+    }
+
+    func testGestureIgnoresSelectionItDidNotChange() {
+        // Input box holds "draft". Other captures happened since, so plain
+        // dedupe does not protect. A drag in the AX-blind list still reads
+        // "draft" from the focused input — unchanged across the gesture,
+        // so it must be distrusted and the fallback must win.
+        engine.mouseDown()
+        reader.selection = "draft"
+        reader.focusedRole = "AXTextArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message one")
+        }
+        engine.mouseDown() // input still reports "draft": snapshot taken
+        engine.selectionGesture()
+        scheduler.runAll()
+        XCTAssertEqual(captures.map(\.text), ["draft", "message one"])
+
+        // lastReported is now "message one"; the stale "draft" would pass
+        // dedupe — the mouse-down snapshot must stop it.
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message two")
+        }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(
+            captures.map(\.text), ["draft", "message one", "message two"],
+            "the unchanged focused-field text must never win over the fallback")
+    }
+
+    func testContentCaptureStillProvesApp() {
+        // A read-only AX capture (browser page) proves the app: later
+        // empty drags must not synthesize Cmd+C.
+        engine.mouseDown()
+        reader.selection = "page text"
+        reader.focusedRole = "AXWebArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        reader.selection = nil
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 0)
+        XCTAssertEqual(captures.count, 1)
     }
 
     // MARK: - Gesture: self-copy-on-select apps
@@ -185,11 +359,16 @@ final class CaptureEngineTests: XCTestCase {
     // MARK: - Dedupe
 
     func testSameTextIsNotCapturedTwice() {
-        reader.selection = "same"
         engine.mouseDown()
+        reader.selection = "same"
         engine.selectionGesture()
         scheduler.runAll()
+
+        // Re-drag over the same text: the click collapses the selection,
+        // the drag re-creates it.
+        reader.selection = nil
         engine.mouseDown()
+        reader.selection = "same"
         engine.selectionGesture()
         scheduler.runAll()
 
@@ -209,9 +388,10 @@ final class CaptureEngineTests: XCTestCase {
     // MARK: - Select-to-edit suppression (delayed commit)
 
     private func gestureCapture(_ text: String, focusedRole: String) {
+        reader.selection = nil // the click collapses any previous selection
+        engine.mouseDown()
         reader.selection = text
         reader.focusedRole = focusedRole
-        engine.mouseDown()
         engine.selectionGesture()
     }
 
