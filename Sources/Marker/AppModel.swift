@@ -125,7 +125,7 @@ final class AppModel {
         }
         middleClickTap.onMiddleClick = { [weak self] point in
             guard let self, self.middleClickPasteEnabled, self.axTrusted,
-                  MiddlePastePolicy.shouldPaste(role: self.axMonitor.roleAtMouseLocation()),
+                  self.shouldPasteAtCursor(input: "middle-click"),
                   let text = self.history.items.first?.text
             else { return false }
             _ = point
@@ -134,19 +134,10 @@ final class AppModel {
             return true
         }
         trackpadTap.onThreeFingerTap = { [weak self] in
-            guard let self, self.threeFingerTapEnabled, self.axTrusted else { return }
-            // The tap pastes into the focused element, so accept either a
-            // text role under the cursor or a focused text element (kitty
-            // and friends hit-test as AXWindow but focus an AXTextArea).
-            let cursorRole = self.axMonitor.roleAtMouseLocation()
-            let focusedRole = MiddlePastePolicy.shouldPaste(role: cursorRole)
-                ? cursorRole
-                : self.axMonitor.focusedElementRole()
-            guard MiddlePastePolicy.shouldPaste(role: focusedRole) else {
-                markerLog.info("tap ignored: cursor=\(cursorRole ?? "nil", privacy: .public) focused=\(focusedRole ?? "nil", privacy: .public)")
-                return
-            }
-            guard let text = self.history.items.first?.text else { return }
+            guard let self, self.threeFingerTapEnabled, self.axTrusted,
+                  self.shouldPasteAtCursor(input: "tap"),
+                  let text = self.history.items.first?.text
+            else { return }
             self.pasteEngine.pasteIntoActiveApp(text)
         }
         if threeFingerTapEnabled {
@@ -219,6 +210,20 @@ final class AppModel {
         if isNew, toastEnabled {
             ToastPresenter.shared.show(text: text, appName: app.name, bundleID: app.bundleID)
         }
+    }
+
+    /// Shared gate for middle-click and three-finger tap; both paste into
+    /// the focused element, so both use the same cursor/focus policy.
+    private func shouldPasteAtCursor(input: String) -> Bool {
+        let cursorRole = axMonitor.roleAtMouseLocation()
+        guard MiddlePastePolicy.shouldPaste(
+            cursorRole: cursorRole,
+            focusedRole: { self.axMonitor.focusedElementRole() }
+        ) else {
+            markerLog.info("\(input, privacy: .public) ignored: cursor=\(cursorRole ?? "nil", privacy: .public)")
+            return false
+        }
+        return true
     }
 
     private func promptForAccessibilityIfNeeded() {
