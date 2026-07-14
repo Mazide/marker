@@ -2,7 +2,8 @@ import Foundation
 
 /// All capture decision-making, free of AppKit/AX types:
 /// - debounces AX selection notifications
-/// - filters programmatic selections (Cmd+L, autocomplete) by keystroke intent
+/// - filters programmatic selections (Cmd+L, autocomplete, bookmark
+///   clicks) by keystroke and click intent
 /// - on mouse gestures: AX first, then self-copy detection, then Cmd+C
 ///   fallback with clipboard restore
 @MainActor
@@ -21,6 +22,12 @@ final class CaptureEngine {
         /// this long: a focused text field re-reporting its old selection
         /// during a drag elsewhere (Telegram) must not clobber the capture.
         var notificationQuiet: TimeInterval = 1.0
+        /// AX notifications within this window after a plain click are the
+        /// app selecting text by itself (clicking a bookmark puts the page
+        /// URL selected into the address bar) — real mouse selections
+        /// arrive via the gesture path, real keyboard selections carry a
+        /// selection-intent keystroke after the click.
+        var clickQuiet: TimeInterval = 1.5
     }
 
     /// Element roles where a drag is not a text selection.
@@ -52,6 +59,8 @@ final class CaptureEngine {
     private var downChangeCount = 0
     private var downSnapshot: PasteboardSnapshot?
     private var downSelection: String?
+    private var lastMouseDown = Date.distantPast
+    private var lastMouseDownWasShift = false
     private var lastGestureCapture = Date.distantPast
     /// Ring of recently captured texts. Focused text fields re-report
     /// their old selection whenever the user clicks elsewhere in the app
@@ -115,9 +124,13 @@ final class CaptureEngine {
         }
     }
 
-    func mouseDown() {
+    func mouseDown(shiftClick: Bool = false) {
         downChangeCount = pasteboard.changeCount
         downSnapshot = nil
+        lastMouseDown = now()
+        // Shift+click extends a selection: that IS selection intent, and
+        // it arrives only as a notification (no drag, no multi-click).
+        lastMouseDownWasShift = shiftClick
         // A selection produced by this gesture must differ from whatever
         // the focused element reported before it: a focused text field
         // keeps reporting its old selection while the user drags in an
@@ -152,6 +165,17 @@ final class CaptureEngine {
         }
         if now().timeIntervalSince(lastGestureCapture) < config.notificationQuiet {
             markerLog.debug("skip: notification right after a gesture capture")
+            return
+        }
+        // A plain click just before this notification: the selection is the
+        // app's own doing (bookmark click, focus change re-selecting a
+        // field). A selection-intent keystroke after the click (shift+arrow
+        // following a caret click) or a shift+click still counts as the
+        // user selecting.
+        if now().timeIntervalSince(lastMouseDown) < config.clickQuiet,
+           !lastMouseDownWasShift,
+           !(lastKeyDown >= lastMouseDown && lastKeyWasSelectionIntent) {
+            markerLog.debug("skip: notification right after a plain click")
             return
         }
         guard let app = frontmost.frontmostApp(), !app.isSelf,

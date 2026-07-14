@@ -404,6 +404,79 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(captures.count, 1)
     }
 
+    func testBookmarkClickSelectionIsSkipped() {
+        // Clicking a bookmark: a plain click, then the browser selects the
+        // page URL in the address bar by itself. No drag, no multi-click,
+        // no keystroke — must not reach the clipboard.
+        engine.mouseDown()
+        reader.selection = "https://example.com/bookmarked"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty, "programmatic selection after a plain click must be skipped")
+    }
+
+    func testBookmarkClickDoesNotPoisonFallbackForBlindAreas() {
+        // The full Google-Docs death chain: the bookmark click makes the
+        // browser select the URL in the address bar; that must neither be
+        // captured nor mark the browser AX-proven — a later selection in
+        // the AX-blind canvas (Google Docs) still needs the Cmd+C fallback.
+        engine.mouseDown()
+        reader.selection = "https://example.com/bookmarked"
+        reader.focusedRole = "AXTextField" // address bar holds focus
+        engine.axSelectionChanged()
+        scheduler.runAll()
+        XCTAssertTrue(captures.isEmpty)
+
+        // Selection in the AX-blind canvas.
+        reader.selection = nil
+        reader.focusedRole = nil
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("doc text")
+        }
+        clock = clock.addingTimeInterval(5)
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 1, "fallback must survive the bookmark click")
+        XCTAssertEqual(captures.map(\.text), ["doc text"])
+    }
+
+    func testKeyboardSelectionAfterCaretClickIsCaptured() {
+        // Click to place the caret, then shift+arrows to select: the
+        // selection-intent keystroke after the click legitimizes it.
+        engine.mouseDown()
+        clock = clock.addingTimeInterval(0.3)
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        reader.selection = "selected via shift+end"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.map(\.text), ["selected via shift+end"])
+    }
+
+    func testShiftClickExtendIsCaptured() {
+        // Shift+click extends a selection — no drag, no keystroke, but the
+        // shift on the click itself is selection intent.
+        engine.mouseDown(shiftClick: true)
+        reader.selection = "extended selection"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.map(\.text), ["extended selection"])
+    }
+
+    func testNotificationLongAfterClickIsCaptured() {
+        engine.mouseDown()
+        clock = clock.addingTimeInterval(3)
+        reader.selection = "selection well after the click"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 1)
+    }
+
     func testDebounceCoalescesNotificationBursts() {
         reader.selection = "final"
         engine.axSelectionChanged()
