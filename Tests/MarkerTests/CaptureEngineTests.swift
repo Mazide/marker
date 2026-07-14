@@ -10,6 +10,7 @@ final class CaptureEngineTests: XCTestCase {
     private var scheduler: FakeScheduler!
     private var engine: CaptureEngine!
     private var captures: [(text: String, app: SourceApp, viaAX: Bool)] = []
+    private var capturedContents: [RichText] = []
     private var clock: Date!
 
     override func setUp() async throws {
@@ -20,6 +21,7 @@ final class CaptureEngineTests: XCTestCase {
         scheduler = FakeScheduler()
         clock = Date(timeIntervalSince1970: 1_000_000)
         captures = []
+        capturedContents = []
         engine = CaptureEngine(
             selection: reader,
             pasteboard: pasteboard,
@@ -28,8 +30,9 @@ final class CaptureEngineTests: XCTestCase {
             scheduler: scheduler,
             now: { [unowned self] in self.clock }
         )
-        engine.onCapture = { [unowned self] text, app, viaAX in
-            self.captures.append((text, app, viaAX))
+        engine.onCapture = { [unowned self] content, app, viaAX in
+            self.captures.append((content.plain, app, viaAX))
+            self.capturedContents.append(content)
         }
     }
 
@@ -236,6 +239,61 @@ final class CaptureEngineTests: XCTestCase {
 
         XCTAssertEqual(keys.copyCount, 0)
         XCTAssertEqual(captures.count, 1)
+    }
+
+    // MARK: - Rich flavors
+
+    func testAXCaptureCarriesMatchingRichFlavors() {
+        let rtf = Data("rtf-bytes".utf8)
+        engine.mouseDown()
+        reader.selection = "  hello world \n"
+        reader.richSelection = RichText(plain: "hello world", rtf: rtf, html: "<b>hello world</b>")
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(capturedContents.count, 1)
+        XCTAssertEqual(capturedContents[0].plain, "hello world")
+        XCTAssertEqual(capturedContents[0].rtf, rtf)
+        XCTAssertEqual(capturedContents[0].html, "<b>hello world</b>")
+    }
+
+    func testMismatchedRichReadIsDropped() {
+        engine.mouseDown()
+        reader.selection = "hello world"
+        reader.richSelection = RichText(plain: "something else", rtf: Data("x".utf8))
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(capturedContents.count, 1)
+        XCTAssertNil(capturedContents[0].rtf, "flavors for a different text must not attach")
+        XCTAssertNil(capturedContents[0].html)
+    }
+
+    func testFallbackCaptureCarriesPasteboardFlavors() {
+        let rtf = Data("telegram-rtf".utf8)
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("message text", rtf: rtf, html: "<i>message text</i>")
+        }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(capturedContents.count, 1)
+        XCTAssertEqual(capturedContents[0].rtf, rtf)
+        XCTAssertEqual(capturedContents[0].html, "<i>message text</i>")
+        XCTAssertEqual(pasteboard.currentRTF, nil, "previous clipboard must be restored")
+    }
+
+    func testDelayedEditableCommitKeepsFlavors() {
+        engine.mouseDown()
+        reader.selection = "draft"
+        reader.richSelection = RichText(plain: "draft", rtf: Data("d".utf8))
+        reader.focusedRole = "AXTextArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(capturedContents.count, 1)
+        XCTAssertEqual(capturedContents[0].rtf, Data("d".utf8))
     }
 
     // MARK: - Gesture: self-copy-on-select apps

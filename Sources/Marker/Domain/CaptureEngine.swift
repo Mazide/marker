@@ -30,7 +30,7 @@ final class CaptureEngine {
         "AXRadioButton", "AXToolbar", "AXTabGroup", "AXDisclosureTriangle",
     ]
 
-    var onCapture: ((_ text: String, _ app: SourceApp, _ viaAX: Bool) -> Void)?
+    var onCapture: ((_ content: RichText, _ app: SourceApp, _ viaAX: Bool) -> Void)?
     /// Delay-and-drop select-to-edit filtering for editable fields.
     var retractionEnabled = true
 
@@ -62,7 +62,7 @@ final class CaptureEngine {
     private let recentCapturesLimit = 12
 
     private struct PendingCommit {
-        let text: String
+        let content: RichText
         let app: SourceApp
         let viaAX: Bool
         let token: SchedulerToken
@@ -186,14 +186,14 @@ final class CaptureEngine {
         // selection is already on the clipboard. Take it, then put the
         // user's previous clipboard back.
         if pasteboard.changeCount != downCount {
-            let text = pasteboard.readString()
+            let content = pasteboard.readContent()
             if let snapshot = downSnapshot {
                 pasteboard.restore(snapshot)
                 downSnapshot = nil
             }
-            if let text {
-                markerLog.info("app self-copied \(text.count) chars")
-                captureFromGesture(text, app: app, viaAX: false)
+            if let content {
+                markerLog.info("app self-copied \(content.plain.count) chars")
+                captureFromGesture(content.plain, app: app, viaAX: false, flavors: content)
             }
             return
         }
@@ -220,11 +220,11 @@ final class CaptureEngine {
             guard let self else { return }
             if self.pasteboard.changeCount != before {
                 // A file copy (e.g. Finder) is not a text selection.
-                let text = self.pasteboard.containsFileURLs() ? nil : self.pasteboard.readString()
+                let content = self.pasteboard.containsFileURLs() ? nil : self.pasteboard.readContent()
                 self.pasteboard.restore(saved)
-                if let text {
-                    markerLog.info("fallback captured \(text.count) chars")
-                    self.captureFromGesture(text, app: app, viaAX: false)
+                if let content {
+                    markerLog.info("fallback captured \(content.plain.count) chars")
+                    self.captureFromGesture(content.plain, app: app, viaAX: false, flavors: content)
                 }
             } else if attemptsLeft > 0 {
                 self.poll(app: app, before: before, saved: saved, attemptsLeft: attemptsLeft - 1)
@@ -238,16 +238,19 @@ final class CaptureEngine {
     /// Gesture-path capture: on success, AX notifications are silenced for
     /// notificationQuiet so a stale re-report cannot clobber this capture.
     @discardableResult
-    private func captureFromGesture(_ text: String, app: SourceApp, viaAX: Bool) -> Bool {
-        guard capture(text, app: app, viaAX: viaAX) else { return false }
+    private func captureFromGesture(_ text: String, app: SourceApp, viaAX: Bool, flavors: RichText? = nil) -> Bool {
+        guard capture(text, app: app, viaAX: viaAX, flavors: flavors) else { return false }
         lastGestureCapture = now()
         return true
     }
 
     /// Returns false when the text was empty or a duplicate of the last
-    /// capture — the caller may then try other capture paths.
+    /// capture — the caller may then try other capture paths. `flavors`
+    /// carries rich pasteboard content from the fallback paths; AX captures
+    /// fetch their rich version here, after the guards, so a rejected
+    /// capture never pays for the attributed AX read.
     @discardableResult
-    private func capture(_ rawText: String, app: SourceApp, viaAX: Bool) -> Bool {
+    private func capture(_ rawText: String, app: SourceApp, viaAX: Bool, flavors: RichText? = nil) -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text != lastReported else { return false }
         lastReported = text
@@ -267,6 +270,18 @@ final class CaptureEngine {
             axProvenApps.insert(app.bundleID)
         }
 
+        var content = RichText(plain: text)
+        if let flavors {
+            content.rtf = flavors.rtf
+            content.html = flavors.html
+        } else if viaAX, let rich = selection.currentSelectionRich(),
+                  rich.plain == text {
+            // Attach only when the attributed read describes the same text;
+            // a mismatch means the selection moved on — plain is the truth.
+            content.rtf = rich.rtf
+            content.html = rich.html
+        }
+
         // Editable fields: hold the commit briefly. Typing in the window
         // cancels it (select-to-edit); silence commits it. Fallback
         // (terminal) captures and read-only contexts commit instantly.
@@ -275,17 +290,17 @@ final class CaptureEngine {
             let token = scheduler.schedule(after: config.commitDelay) { [weak self] in
                 guard let self, let pending = self.pendingCommit else { return }
                 self.pendingCommit = nil
-                self.commit(pending.text, app: pending.app, viaAX: pending.viaAX)
+                self.commit(pending.content, app: pending.app, viaAX: pending.viaAX)
             }
-            pendingCommit = PendingCommit(text: text, app: app, viaAX: viaAX, token: token)
+            pendingCommit = PendingCommit(content: content, app: app, viaAX: viaAX, token: token)
         } else {
-            commit(text, app: app, viaAX: viaAX)
+            commit(content, app: app, viaAX: viaAX)
         }
         return true
     }
 
-    private func commit(_ text: String, app: SourceApp, viaAX: Bool) {
-        markerLog.info("captured \(text.count) chars viaAX=\(viaAX)")
-        onCapture?(text, app, viaAX)
+    private func commit(_ content: RichText, app: SourceApp, viaAX: Bool) {
+        markerLog.info("captured \(content.plain.count) chars viaAX=\(viaAX) rich=\(content.hasFlavors)")
+        onCapture?(content, app, viaAX)
     }
 }

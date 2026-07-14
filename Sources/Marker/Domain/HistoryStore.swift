@@ -7,6 +7,30 @@ struct SelectionItem: Identifiable, Codable, Equatable {
     let date: Date
     let appName: String
     let bundleID: String
+    let rtf: Data?
+    let html: String?
+
+    init(
+        id: UUID,
+        text: String,
+        date: Date,
+        appName: String,
+        bundleID: String,
+        rtf: Data? = nil,
+        html: String? = nil
+    ) {
+        self.id = id
+        self.text = text
+        self.date = date
+        self.appName = appName
+        self.bundleID = bundleID
+        self.rtf = rtf
+        self.html = html
+    }
+
+    var content: RichText {
+        RichText(plain: text, rtf: rtf, html: html)
+    }
 }
 
 /// In-memory window over the history database: recent page(s) for the UI,
@@ -38,7 +62,11 @@ final class HistoryStore {
     }
 
     func push(text rawText: String, app: SourceApp) {
-        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        push(RichText(plain: rawText), app: app)
+    }
+
+    func push(_ content: RichText, app: SourceApp) {
+        let text = content.plain.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, items.first?.text != text else { return }
 
         if let first = items.first,
@@ -54,7 +82,9 @@ final class HistoryStore {
             text: text,
             date: now(),
             appName: app.name,
-            bundleID: app.bundleID
+            bundleID: app.bundleID,
+            rtf: content.rtf,
+            html: content.html
         )
         items.removeAll { $0.text == text }
         db.deleteAll(text: text)

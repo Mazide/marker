@@ -53,6 +53,14 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
         return selectedText(of: focused)
     }
 
+    func currentSelectionRich() -> RichText? {
+        if let pendingElement, let rich = richSelectedText(of: pendingElement) {
+            return rich
+        }
+        guard let focused = focusedElement() else { return nil }
+        return richSelectedText(of: focused)
+    }
+
     /// Role of the focused element — apps with minimal AX trees (kitty)
     /// return nothing useful from position hit-testing but do report focus.
     func focusedElementRole() -> String? {
@@ -169,6 +177,141 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
             return nil
         }
         return text
+    }
+
+    /// Attributed selection via AXAttributedStringForRange, translated
+    /// from AX text attributes (AXFont, AXForegroundColor, …) to display
+    /// attributes and serialized as RTF + HTML. Whitespace at both ends is
+    /// trimmed so the flavors match the trimmed plain text the engine
+    /// stores. Returns nil when the app exposes no attributed text or no
+    /// run carries an attribute we can translate.
+    private func richSelectedText(of element: AXUIElement) -> RichText? {
+        var rangeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &rangeRef
+        ) == .success,
+              let rangeRef,
+              CFGetTypeID(rangeRef) == AXValueGetTypeID()
+        else { return nil }
+
+        var range = CFRange()
+        guard AXValueGetValue(rangeRef as! AXValue, .cfRange, &range),
+              range.length > 0, range.length <= 200_000
+        else { return nil }
+
+        var attrRef: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element,
+            "AXAttributedStringForRange" as CFString,
+            rangeRef,
+            &attrRef
+        ) == .success,
+              let axString = attrRef as? NSAttributedString,
+              axString.length > 0
+        else { return nil }
+
+        guard let display = displayAttributed(from: axString) else { return nil }
+
+        let plain = display.string
+        let trimmedPlain = plain.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPlain.isEmpty else { return nil }
+        var trimmed = display
+        if trimmedPlain != plain {
+            let trimRange = (plain as NSString).range(of: trimmedPlain)
+            guard trimRange.location != NSNotFound else { return nil }
+            trimmed = display.attributedSubstring(from: trimRange)
+        }
+
+        let fullRange = NSRange(location: 0, length: trimmed.length)
+        var content = RichText(plain: trimmedPlain)
+        if let rtf = try? trimmed.data(
+            from: fullRange,
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        ), rtf.count <= RichText.flavorByteLimit {
+            content.rtf = rtf
+        }
+        if let htmlData = try? trimmed.data(
+            from: fullRange,
+            documentAttributes: [
+                .documentType: NSAttributedString.DocumentType.html,
+                .characterEncoding: String.Encoding.utf8.rawValue,
+            ]
+        ), htmlData.count <= RichText.flavorByteLimit,
+           let html = String(data: htmlData, encoding: .utf8) {
+            content.html = html
+        }
+        guard content.hasFlavors else { return nil }
+        return content
+    }
+
+    /// AX attributed strings carry AX-specific keys, not display keys —
+    /// serializing them directly would produce unformatted RTF. Translate
+    /// the runs we understand; nil when nothing translated (plain capture
+    /// is the honest result then).
+    private func displayAttributed(from axString: NSAttributedString) -> NSAttributedString? {
+        let out = NSMutableAttributedString(string: axString.string)
+        var sawFormatting = false
+        axString.enumerateAttributes(
+            in: NSRange(location: 0, length: axString.length)
+        ) { attributes, range, _ in
+            var display: [NSAttributedString.Key: Any] = [:]
+            if let fontInfo = attributes[NSAttributedString.Key("AXFont")] as? [String: Any] {
+                let size = (fontInfo["AXFontSize"] as? NSNumber)?.doubleValue ?? 0
+                if let name = fontInfo["AXFontName"] as? String, size > 0,
+                   let font = NSFont(name: name, size: size) {
+                    display[.font] = font
+                }
+            }
+            if let value = attributes[NSAttributedString.Key("AXForegroundColor")],
+               let color = nsColor(from: value) {
+                display[.foregroundColor] = color
+            }
+            if let value = attributes[NSAttributedString.Key("AXBackgroundColor")],
+               let color = nsColor(from: value) {
+                display[.backgroundColor] = color
+            }
+            if let underline = attributes[NSAttributedString.Key("AXUnderline")] as? NSNumber,
+               underline.intValue != 0 {
+                display[.underlineStyle] = NSUnderlineStyle.single.rawValue
+            }
+            if let strike = attributes[NSAttributedString.Key("AXStrikethrough")] as? NSNumber,
+               strike.boolValue {
+                display[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+            }
+            if let url = linkURL(from: attributes[NSAttributedString.Key("AXLink")]) {
+                display[.link] = url
+            }
+            if !display.isEmpty {
+                out.addAttributes(display, range: range)
+                sawFormatting = true
+            }
+        }
+        return sawFormatting ? out : nil
+    }
+
+    private func nsColor(from value: Any) -> NSColor? {
+        let ref = value as CFTypeRef
+        guard CFGetTypeID(ref) == CGColor.typeID else { return nil }
+        return NSColor(cgColor: ref as! CGColor)
+    }
+
+    /// AXLink's value is the link's AXUIElement; its AXURL is the target.
+    private func linkURL(from value: Any?) -> URL? {
+        guard let value else { return nil }
+        let ref = value as CFTypeRef
+        guard CFGetTypeID(ref) == AXUIElementGetTypeID() else { return nil }
+        var urlRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            ref as! AXUIElement,
+            "AXURL" as CFString,
+            &urlRef
+        ) == .success,
+              let urlRef,
+              CFGetTypeID(urlRef) == CFURLGetTypeID()
+        else { return nil }
+        return (urlRef as! CFURL) as URL
     }
 
     private func focusedElement() -> AXUIElement? {

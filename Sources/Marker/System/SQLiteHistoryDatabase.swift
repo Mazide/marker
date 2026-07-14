@@ -34,6 +34,7 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
         """)
         exec("CREATE INDEX IF NOT EXISTS idx_items_date ON items(date DESC)")
         exec("CREATE INDEX IF NOT EXISTS idx_items_text ON items(text)")
+        addRichColumnsIfNeeded()
         migrateLegacyJSONIfNeeded(next(to: url))
     }
 
@@ -43,10 +44,26 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
 
     // MARK: - HistoryDatabase
 
+    /// Existing databases predate the rich-text columns (0.9.x).
+    private func addRichColumnsIfNeeded() {
+        var existing = Set<String>()
+        withStatement("PRAGMA table_info(items)") { statement in
+            while sqlite3_step(statement) == SQLITE_ROW {
+                existing.insert(column(statement, 1))
+            }
+        }
+        if !existing.contains("rtf") {
+            exec("ALTER TABLE items ADD COLUMN rtf BLOB")
+        }
+        if !existing.contains("html") {
+            exec("ALTER TABLE items ADD COLUMN html TEXT")
+        }
+    }
+
     func insert(_ item: SelectionItem) {
         withStatement("""
-        INSERT OR REPLACE INTO items(id, text, text_lc, date, appName, appName_lc, bundleID)
-        VALUES(?,?,?,?,?,?,?)
+        INSERT OR REPLACE INTO items(id, text, text_lc, date, appName, appName_lc, bundleID, rtf, html)
+        VALUES(?,?,?,?,?,?,?,?,?)
         """) { statement in
             bind(statement, 1, item.id.uuidString)
             bind(statement, 2, item.text)
@@ -55,6 +72,18 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
             bind(statement, 5, item.appName)
             bind(statement, 6, item.appName.lowercased())
             bind(statement, 7, item.bundleID)
+            if let rtf = item.rtf {
+                rtf.withUnsafeBytes { buffer in
+                    _ = sqlite3_bind_blob(statement, 8, buffer.baseAddress, Int32(buffer.count), SQLITE_TRANSIENT)
+                }
+            } else {
+                sqlite3_bind_null(statement, 8)
+            }
+            if let html = item.html {
+                bind(statement, 9, html)
+            } else {
+                sqlite3_bind_null(statement, 9)
+            }
             sqlite3_step(statement)
         }
     }
@@ -86,7 +115,7 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
 
     func recent(limit: Int, offset: Int) -> [SelectionItem] {
         var result: [SelectionItem] = []
-        withStatement("SELECT id, text, date, appName, bundleID FROM items ORDER BY date DESC LIMIT ? OFFSET ?") { statement in
+        withStatement("SELECT id, text, date, appName, bundleID, rtf, html FROM items ORDER BY date DESC LIMIT ? OFFSET ?") { statement in
             sqlite3_bind_int(statement, 1, Int32(limit))
             sqlite3_bind_int(statement, 2, Int32(offset))
             result = rows(statement)
@@ -95,7 +124,7 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
     }
 
     func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem] {
-        var sql = "SELECT id, text, date, appName, bundleID FROM items WHERE 1=1"
+        var sql = "SELECT id, text, date, appName, bundleID, rtf, html FROM items WHERE 1=1"
         if text != nil { sql += " AND (text_lc LIKE ? ESCAPE '\\' OR appName_lc LIKE ? ESCAPE '\\')" }
         if bundleID != nil { sql += " AND bundleID = ?" }
         sql += " ORDER BY date DESC LIMIT ?"
@@ -202,10 +231,28 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
                 text: column(statement, 1),
                 date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 2)),
                 appName: column(statement, 3),
-                bundleID: column(statement, 4)
+                bundleID: column(statement, 4),
+                rtf: blobColumn(statement, 5),
+                html: optionalColumn(statement, 6)
             ))
         }
         return result
+    }
+
+    private func blobColumn(_ statement: OpaquePointer?, _ index: Int32) -> Data? {
+        guard sqlite3_column_type(statement, index) == SQLITE_BLOB,
+              let bytes = sqlite3_column_blob(statement, index)
+        else { return nil }
+        let count = Int(sqlite3_column_bytes(statement, index))
+        guard count > 0 else { return nil }
+        return Data(bytes: bytes, count: count)
+    }
+
+    private func optionalColumn(_ statement: OpaquePointer?, _ index: Int32) -> String? {
+        guard sqlite3_column_type(statement, index) != SQLITE_NULL,
+              let cString = sqlite3_column_text(statement, index)
+        else { return nil }
+        return String(cString: cString)
     }
 
     private func escapeLike(_ input: String) -> String {

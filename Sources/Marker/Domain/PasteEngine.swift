@@ -32,8 +32,12 @@ final class PasteEngine {
     }
 
     func pasteIntoActiveApp(_ text: String) {
+        pasteIntoActiveApp(RichText(plain: text))
+    }
+
+    func pasteIntoActiveApp(_ content: RichText) {
         waitForModifierRelease(deadline: now().addingTimeInterval(config.modifierWait)) { [weak self] in
-            self?.performPaste(text)
+            self?.performPaste(content)
         }
     }
 
@@ -47,10 +51,10 @@ final class PasteEngine {
         }
     }
 
-    private func performPaste(_ text: String) {
+    private func performPaste(_ content: RichText) {
         let saved = pasteboard.snapshot()
-        pasteboard.writeString(text)
-        markerLog.info("paste: \(text.count) chars via Cmd+V")
+        pasteboard.writeContent(content)
+        markerLog.info("paste: \(content.plain.count) chars via Cmd+V rich=\(content.hasFlavors)")
         keys.postPaste()
         scheduler.schedule(after: config.restoreDelay) { [pasteboard] in
             pasteboard.restore(saved)

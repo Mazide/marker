@@ -1,3 +1,4 @@
+import SQLite3
 import XCTest
 @testable import Marker
 
@@ -73,6 +74,65 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         db.deleteAll(text: "dup")
 
         XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["keep"])
+    }
+
+    func testRichFlavorsRoundTrip() {
+        let rtf = Data("rtf-bytes".utf8)
+        db.insert(SelectionItem(
+            id: UUID(), text: "styled",
+            date: Date(timeIntervalSince1970: 1_000_000),
+            appName: "Safari", bundleID: "com.apple.Safari",
+            rtf: rtf, html: "<b>styled</b>"
+        ))
+        db.insert(item("plain", offset: 10))
+
+        let loaded = db.recent(limit: 10, offset: 0)
+        XCTAssertNil(loaded[0].rtf)
+        XCTAssertNil(loaded[0].html)
+        XCTAssertEqual(loaded[1].rtf, rtf)
+        XCTAssertEqual(loaded[1].html, "<b>styled</b>")
+
+        let queried = db.query(text: "styled", bundleID: nil, limit: 10)
+        XCTAssertEqual(queried.first?.rtf, rtf)
+    }
+
+    func testOpensPreRichSchemaAndAddsColumns() {
+        // Recreate the 0.9.x schema (no rtf/html), insert a row, then let
+        // SQLiteHistoryDatabase migrate it on open.
+        db = nil
+        try? FileManager.default.removeItem(at: url)
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &raw), SQLITE_OK)
+        sqlite3_exec(raw, """
+        CREATE TABLE items(
+            id TEXT PRIMARY KEY,
+            text TEXT NOT NULL,
+            text_lc TEXT NOT NULL,
+            date REAL NOT NULL,
+            appName TEXT NOT NULL,
+            appName_lc TEXT NOT NULL,
+            bundleID TEXT NOT NULL
+        )
+        """, nil, nil, nil)
+        sqlite3_exec(raw, """
+        INSERT INTO items VALUES('00000000-0000-0000-0000-000000000001',
+            'legacy', 'legacy', 1000000, 'Telegram', 'telegram', 'org.telegram')
+        """, nil, nil, nil)
+        sqlite3_close(raw)
+
+        db = SQLiteHistoryDatabase(url: url)
+
+        let loaded = db.recent(limit: 10, offset: 0)
+        XCTAssertEqual(loaded.map(\.text), ["legacy"])
+        XCTAssertNil(loaded[0].rtf)
+
+        db.insert(SelectionItem(
+            id: UUID(), text: "new",
+            date: Date(timeIntervalSince1970: 1_000_100),
+            appName: "Safari", bundleID: "com.apple.Safari",
+            rtf: Data("r".utf8), html: nil
+        ))
+        XCTAssertEqual(db.recent(limit: 10, offset: 0).first?.rtf, Data("r".utf8))
     }
 
     func testDeleteOlderThanCutoff() {

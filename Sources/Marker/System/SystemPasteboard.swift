@@ -18,6 +18,33 @@ final class SystemPasteboard: PasteboardControlling {
         pasteboard.setString(string, forType: .string)
     }
 
+    func readContent() -> RichText? {
+        guard let plain = pasteboard.string(forType: .string) else { return nil }
+        var content = RichText(plain: plain)
+        if let rtf = pasteboard.data(forType: .rtf),
+           rtf.count <= RichText.flavorByteLimit {
+            content.rtf = rtf
+        }
+        if let html = pasteboard.string(forType: .html),
+           html.utf8.count <= RichText.flavorByteLimit {
+            content.html = html
+        }
+        return content
+    }
+
+    func writeContent(_ content: RichText) {
+        pasteboard.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(content.plain, forType: .string)
+        if let rtf = content.rtf {
+            item.setData(rtf, forType: .rtf)
+        }
+        if let html = content.html {
+            item.setString(html, forType: .html)
+        }
+        pasteboard.writeObjects([item])
+    }
+
     func snapshot() -> PasteboardSnapshot {
         let items = (pasteboard.pasteboardItems ?? []).map { item in
             var entry: [NSPasteboard.PasteboardType: Data] = [:]

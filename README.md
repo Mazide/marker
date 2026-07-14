@@ -11,6 +11,9 @@ go to the separate history only.
 ## Features
 
 - Watches text selections system-wide via the Accessibility API.
+- Keeps formatting where the source app exposes it: captures carry
+  RTF/HTML flavors alongside plain text, so auto-copy, ⌥V and history
+  copies paste rich into targets that accept it.
 - Auto-copy to the system clipboard — on by default, toggleable for
   strict separate-buffer mode.
 - Fallback capture for apps that hide selections from Accessibility

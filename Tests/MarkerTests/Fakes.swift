@@ -4,10 +4,14 @@ import Foundation
 final class FakePasteboard: PasteboardControlling {
     struct Snapshot: PasteboardSnapshot {
         let value: String?
+        let rtf: Data?
+        let html: String?
     }
 
     private(set) var changeCount = 0
     private(set) var current: String?
+    private(set) var currentRTF: Data?
+    private(set) var currentHTML: String?
     private(set) var restoredValues: [String?] = []
     var fileURLsOnBoard = false
 
@@ -15,23 +19,43 @@ final class FakePasteboard: PasteboardControlling {
 
     func writeString(_ string: String) {
         current = string
+        currentRTF = nil
+        currentHTML = nil
         changeCount += 1
     }
 
-    func snapshot() -> PasteboardSnapshot { Snapshot(value: current) }
+    func readContent() -> RichText? {
+        guard let current else { return nil }
+        return RichText(plain: current, rtf: currentRTF, html: currentHTML)
+    }
+
+    func writeContent(_ content: RichText) {
+        current = content.plain
+        currentRTF = content.rtf
+        currentHTML = content.html
+        changeCount += 1
+    }
+
+    func snapshot() -> PasteboardSnapshot {
+        Snapshot(value: current, rtf: currentRTF, html: currentHTML)
+    }
 
     func restore(_ snapshot: PasteboardSnapshot) {
         guard let snapshot = snapshot as? Snapshot else { return }
         restoredValues.append(snapshot.value)
         current = snapshot.value
+        currentRTF = snapshot.rtf
+        currentHTML = snapshot.html
         changeCount += 1
     }
 
     func containsFileURLs() -> Bool { fileURLsOnBoard }
 
     /// Simulate another process writing to the clipboard.
-    func externalWrite(_ string: String) {
+    func externalWrite(_ string: String, rtf: Data? = nil, html: String? = nil) {
         current = string
+        currentRTF = rtf
+        currentHTML = html
         changeCount += 1
     }
 }
@@ -54,10 +78,12 @@ final class FakeKeys: KeyEventSynthesizing {
 
 final class FakeSelectionReader: SelectionReading {
     var selection: String?
+    var richSelection: RichText?
     var roleAtMouse: String?
     var focusedRole: String?
 
     func currentSelection() -> String? { selection }
+    func currentSelectionRich() -> RichText? { richSelection }
     func roleAtMouseLocation() -> String? { roleAtMouse }
     func focusedElementRole() -> String? { focusedRole }
 }

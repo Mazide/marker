@@ -11,6 +11,11 @@ protocol PasteboardControlling: AnyObject {
     var changeCount: Int { get }
     func readString() -> String?
     func writeString(_ string: String)
+    /// Plain text plus whatever rich flavors (RTF/HTML) the board holds;
+    /// nil when there is no plain text at all.
+    func readContent() -> RichText?
+    /// Write plain + rich flavors as one multi-flavor item.
+    func writeContent(_ content: RichText)
     func snapshot() -> PasteboardSnapshot
     func restore(_ snapshot: PasteboardSnapshot)
     func containsFileURLs() -> Bool
@@ -27,6 +32,11 @@ protocol SelectionReading: AnyObject {
     /// Best-effort read of the current selection (notification element
     /// first, focused element as fallback).
     func currentSelection() -> String?
+    /// Rich (RTF/HTML) version of the current selection, whitespace-trimmed
+    /// to match the trimmed plain text. Expensive — called only when a
+    /// capture is about to commit. nil when the app exposes no attributed
+    /// AX text or no attribute translates to real formatting.
+    func currentSelectionRich() -> RichText?
     /// AX role of the element under the mouse cursor.
     func roleAtMouseLocation() -> String?
     /// AX role of the focused element.

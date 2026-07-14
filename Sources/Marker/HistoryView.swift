@@ -149,7 +149,7 @@ struct HistoryView: View {
                                 HistoryRow(
                                     item: item,
                                     onCopy: {
-                                        model.copyToClipboard(item.text)
+                                        model.copyToClipboard(item)
                                         dismiss()
                                     },
                                     onDelete: { model.history.delete(item) }

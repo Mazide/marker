@@ -126,29 +126,29 @@ final class AppModel {
         mouseMonitor.onSelectionGesture = { [weak self] in
             self?.engine.selectionGesture()
         }
-        engine.onCapture = { [weak self] text, app, _ in
-            self?.ingest(text: text, app: app)
+        engine.onCapture = { [weak self] content, app, _ in
+            self?.ingest(content: content, app: app)
         }
         hotkey.onHotkey = { [weak self] in
             guard let self, let item = self.history.items.first else { return }
-            self.pasteEngine.pasteIntoActiveApp(item.text)
+            self.pasteEngine.pasteIntoActiveApp(item.content)
         }
         middleClickTap.onMiddleClick = { [weak self] point in
             guard let self, self.middleClickPasteEnabled, self.axTrusted,
                   self.shouldPasteAtCursor(input: "middle-click"),
-                  let text = self.history.items.first?.text
+                  let item = self.history.items.first
             else { return false }
             _ = point
             // Paste into the current focus, same as ⌥V.
-            self.pasteEngine.pasteIntoActiveApp(text)
+            self.pasteEngine.pasteIntoActiveApp(item.content)
             return true
         }
         trackpadTap.onThreeFingerTap = { [weak self] in
             guard let self, self.threeFingerTapEnabled, self.axTrusted,
                   self.shouldPasteAtCursor(input: "tap"),
-                  let text = self.history.items.first?.text
+                  let item = self.history.items.first
             else { return }
-            self.pasteEngine.pasteIntoActiveApp(text)
+            self.pasteEngine.pasteIntoActiveApp(item.content)
         }
         if threeFingerTapEnabled {
             trackpadTap.start()
@@ -204,29 +204,33 @@ final class AppModel {
         pasteboard.writeString(text)
     }
 
+    func copyToClipboard(_ item: SelectionItem) {
+        pasteboard.writeContent(item.content)
+    }
+
     func openAccessibilitySettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
     }
 
-    private func ingest(text: String, app: SourceApp) {
+    private func ingest(content: RichText, app: SourceApp) {
         // Secrets pass through to the clipboard (the user selected them on
         // purpose) but are never persisted to history.
-        if skipSecretsEnabled, SecretDetector.looksSecret(text) {
+        if skipSecretsEnabled, SecretDetector.looksSecret(content.plain) {
             markerLog.info("skipped a selection that looks like a secret")
             if copyToClipboardEnabled {
-                pasteboard.writeString(text)
+                pasteboard.writeContent(content)
             }
             return
         }
 
-        let isNew = history.items.first?.text != text
-        history.push(text: text, app: app)
+        let isNew = history.items.first?.text != content.plain
+        history.push(content, app: app)
         if copyToClipboardEnabled {
-            pasteboard.writeString(text)
+            pasteboard.writeContent(content)
         }
         if isNew, toastEnabled {
-            ToastPresenter.shared.show(text: text, appName: app.name, bundleID: app.bundleID)
+            ToastPresenter.shared.show(text: content.plain, appName: app.name, bundleID: app.bundleID)
         }
     }
 

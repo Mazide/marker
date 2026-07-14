@@ -94,6 +94,22 @@ final class PasteEngineTests: XCTestCase {
         XCTAssertEqual(pasteboard.current, "new selection")
     }
 
+    func testPastesRichContentAndRestoresPlainBoard() {
+        pasteboard.writeString("previous")
+        keys.modifiersHeld = false
+        let rtf = Data("rtf".utf8)
+
+        engine.pasteIntoActiveApp(RichText(plain: "styled", rtf: rtf, html: "<b>styled</b>"))
+
+        XCTAssertEqual(pasteboard.current, "styled")
+        XCTAssertEqual(pasteboard.currentRTF, rtf)
+        XCTAssertEqual(pasteboard.currentHTML, "<b>styled</b>")
+
+        scheduler.runAll()
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertNil(pasteboard.currentRTF, "restore must bring back the pre-paste flavors")
+    }
+
     func testSnapshotIsTakenBeforeWritingNewText() {
         pasteboard.writeString("previous")
         keys.modifiersHeld = false

@@ -134,6 +134,25 @@ extension HistoryStoreTests {
         XCTAssertEqual(db.count(), 1)
     }
 
+    func testPushStoresRichFlavors() {
+        let rtf = Data("rtf".utf8)
+        store.push(RichText(plain: " hello \n", rtf: rtf, html: "<b>hello</b>"), app: telegram)
+
+        XCTAssertEqual(store.items[0].text, "hello")
+        XCTAssertEqual(store.items[0].rtf, rtf)
+        XCTAssertEqual(store.items[0].html, "<b>hello</b>")
+        XCTAssertEqual(store.items[0].content, RichText(plain: "hello", rtf: rtf, html: "<b>hello</b>"))
+    }
+
+    func testRefinementKeepsLatestFlavors() {
+        store.push(RichText(plain: "Оформить", rtf: Data("a".utf8)), app: telegram)
+        clock = clock.addingTimeInterval(2)
+        store.push(RichText(plain: "Оформить таблицу", rtf: Data("b".utf8)), app: telegram)
+
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items[0].rtf, Data("b".utf8))
+    }
+
     func testApplyRetentionDropsOlderEntriesFromStoreAndDatabase() {
         store.push(text: "ancient", app: telegram)
         clock = clock.addingTimeInterval(30 * 86400)
