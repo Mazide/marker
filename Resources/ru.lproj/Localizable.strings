@@ -1,0 +1,67 @@
+/* Settings */
+"Settings" = "Настройки";
+"Updates" = "Обновления";
+"Version %@" = "Версия %@";
+"Check Now…" = "Проверить…";
+"Update Marker automatically" = "Обновлять Marker автоматически";
+"Capture" = "Захват";
+"Copy selections to the clipboard" = "Копировать выделенное в буфер обмена";
+"Every selection is ready to ⌘V; off keeps it in Marker's history only." = "Каждое выделение сразу готово к ⌘V; выкл. — остаётся только в истории Marker.";
+"Ignore selections you immediately edit" = "Игнорировать выделенное, если вы сразу его редактируете";
+"Typing over a fresh selection cancels its capture." = "Печать поверх свежего выделения отменяет его захват.";
+"Never save secrets" = "Не сохранять секреты";
+"Keys and tokens reach the clipboard but stay out of history." = "Ключи и токены попадают в буфер обмена, но не в историю.";
+"Paste" = "Вставка";
+"Middle-click pastes the latest selection" = "Средняя кнопка мыши вставляет последнее выделение";
+"Works over text fields; clicks anywhere else pass through untouched." = "Работает над текстовыми полями; клики в других местах проходят как обычно.";
+"Three-finger tap pastes the latest selection" = "Тап тремя пальцами вставляет последнее выделение";
+"The trackpad equivalent of middle-click. Experimental." = "Аналог средней кнопки для трекпада. Экспериментально.";
+"Interface" = "Интерфейс";
+"Show a popup on capture" = "Показывать уведомление при захвате";
+"Start at login" = "Запускать при входе в систему";
+"History" = "История";
+"Remove every captured selection" = "Удалить всё сохранённое";
+"Clear History…" = "Очистить историю…";
+"Website" = "Сайт";
+"Privacy Policy" = "Конфиденциальность";
+
+/* History popover */
+"Search" = "Поиск";
+"Filter" = "Фильтр";
+"All Apps" = "Все приложения";
+"Filter by app" = "Фильтр по приложению";
+"Today" = "Сегодня";
+"Yesterday" = "Вчера";
+"One permission needed" = "Нужно одно разрешение";
+"Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker читает выделения через Универсальный доступ macOS. Данные не покидают ваш Mac.";
+"Open System Settings" = "Открыть Системные настройки";
+"Nothing here yet" = "Пока пусто";
+"Select text in any app — it lands here, already copied." = "Выделите текст в любом приложении — он появится здесь, уже скопированный.";
+"No matches" = "Ничего не найдено";
+"Nothing selected like that. Try fewer letters or another app filter." = "Такого не выделяли. Попробуйте запрос короче или другой фильтр.";
+"⌥V pastes latest" = "⌥V — вставить последнее";
+"Copy" = "Скопировать";
+"Delete" = "Удалить";
+"Copies this selection" = "Копирует это выделение";
+
+/* Toast */
+"· copied from" = "· скопировано из";
+
+/* Self-installer alert */
+"Move Marker to the Applications folder?" = "Переместить Marker в папку «Программы»?";
+"Marker will move itself to Applications and relaunch from there." = "Marker переместит себя в «Программы» и перезапустится оттуда.";
+"Move to Applications" = "Переместить в «Программы»";
+"Not Now" = "Не сейчас";
+
+/* Settings – ⌘C fallback */
+"Fall back to ⌘C on web pages and Electron apps" = "Запасной ⌘C на веб-страницах и в Electron-приложениях";
+"Keeps real formatting from web content." = "Сохраняет настоящее форматирование веб-контента.";
+"Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard." = "Браузеры и веб-приложения (Slack, Discord, …) отдают форматирование только через собственную команду «Скопировать». Когда вы выделяете там текст, Marker коротко нажимает ⌘C за вас, забирает форматированную копию и возвращает ваш буфер обмена.";
+"More about this setting" = "Подробнее об этой настройке";
+
+/* Settings – history retention */
+"Keep history for" = "Хранить историю";
+"Forever" = "Всегда";
+"7 days" = "7 дней";
+"30 days" = "30 дней";
+"90 days" = "90 дней";

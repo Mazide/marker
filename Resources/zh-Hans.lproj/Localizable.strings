@@ -1,0 +1,67 @@
+/* Settings */
+"Settings" = "设置";
+"Updates" = "更新";
+"Version %@" = "版本 %@";
+"Check Now…" = "立即检查…";
+"Update Marker automatically" = "自动更新 Marker";
+"Capture" = "捕获";
+"Copy selections to the clipboard" = "将所选内容拷贝到剪贴板";
+"Every selection is ready to ⌘V; off keeps it in Marker's history only." = "每次选中的文本都可直接 ⌘V;关闭后仅保存在 Marker 历史中。";
+"Ignore selections you immediately edit" = "忽略立即编辑的所选内容";
+"Typing over a fresh selection cancels its capture." = "选中后立即输入会取消该次捕获。";
+"Never save secrets" = "从不保存机密信息";
+"Keys and tokens reach the clipboard but stay out of history." = "密钥和令牌会进入剪贴板,但不会存入历史。";
+"Paste" = "粘贴";
+"Middle-click pastes the latest selection" = "中键点按粘贴最新所选内容";
+"Works over text fields; clicks anywhere else pass through untouched." = "仅在文本栏上生效；其他位置的点按原样通过。";
+"Three-finger tap pastes the latest selection" = "三指轻点粘贴最新所选内容";
+"The trackpad equivalent of middle-click. Experimental." = "触控板上的中键点按等效操作。实验性功能。";
+"Interface" = "界面";
+"Show a popup on capture" = "捕获时显示弹窗";
+"Start at login" = "登录时启动";
+"History" = "历史记录";
+"Remove every captured selection" = "移除所有已捕获的所选内容";
+"Clear History…" = "清除历史记录…";
+"Website" = "网站";
+"Privacy Policy" = "隐私政策";
+
+/* History popover */
+"Search" = "搜索";
+"Filter" = "过滤";
+"All Apps" = "所有应用";
+"Filter by app" = "按应用过滤";
+"Today" = "今天";
+"Yesterday" = "昨天";
+"One permission needed" = "需要一项权限";
+"Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker 通过 macOS 辅助功能读取所选内容。任何数据都不会离开你的 Mac。";
+"Open System Settings" = "打开系统设置";
+"Nothing here yet" = "这里还没有内容";
+"Select text in any app — it lands here, already copied." = "在任意应用中选中文本，它会出现在这里，并且已拷贝好。";
+"No matches" = "无匹配结果";
+"Nothing selected like that. Try fewer letters or another app filter." = "没有这样的所选内容。试试更短的关键词或其他应用过滤。";
+"⌥V pastes latest" = "⌥V 粘贴最新内容";
+"Copy" = "拷贝";
+"Delete" = "删除";
+"Copies this selection" = "拷贝这条所选内容";
+
+/* Toast */
+"· copied from" = "· 拷贝自";
+
+/* Self-installer alert */
+"Move Marker to the Applications folder?" = "将 Marker 移到“应用程序”文件夹？";
+"Marker will move itself to Applications and relaunch from there." = "Marker 会把自己移到“应用程序”并从那里重新启动。";
+"Move to Applications" = "移到“应用程序”";
+"Not Now" = "暂不";
+
+/* Settings – ⌘C fallback */
+"Fall back to ⌘C on web pages and Electron apps" = "在网页和 Electron 应用中回退到 ⌘C";
+"Keeps real formatting from web content." = "保留网页内容的真实格式。";
+"Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard." = "浏览器和基于网页的应用(Slack、Discord 等)只通过自身的拷贝命令提供格式。当你在其中选中文本时,Marker 会短暂地替你按下 ⌘C 获取带格式的副本,然后恢复你的剪贴板。";
+"More about this setting" = "关于此设置的更多信息";
+
+/* Settings – history retention */
+"Keep history for" = "历史保留时长";
+"Forever" = "永久";
+"7 days" = "7 天";
+"30 days" = "30 天";
+"90 days" = "90 天";

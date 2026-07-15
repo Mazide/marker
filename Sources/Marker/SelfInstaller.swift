@@ -18,10 +18,15 @@ enum SelfInstaller {
 
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Move Marker to the Applications folder?"
-        alert.informativeText = "Marker will move itself to Applications and relaunch from there."
-        alert.addButton(withTitle: "Move to Applications")
-        alert.addButton(withTitle: "Not Now")
+        alert.messageText = NSLocalizedString(
+            "Move Marker to the Applications folder?", comment: "self-install alert title")
+        alert.informativeText = NSLocalizedString(
+            "Marker will move itself to Applications and relaunch from there.",
+            comment: "self-install alert body")
+        alert.addButton(withTitle: NSLocalizedString(
+            "Move to Applications", comment: "self-install confirm button"))
+        alert.addButton(withTitle: NSLocalizedString(
+            "Not Now", comment: "self-install cancel button"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         let destURL = URL(fileURLWithPath: "/Applications/Marker.app")

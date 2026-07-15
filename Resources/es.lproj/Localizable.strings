@@ -1,0 +1,67 @@
+/* Settings */
+"Settings" = "Ajustes";
+"Updates" = "Actualizaciones";
+"Version %@" = "Versión %@";
+"Check Now…" = "Buscar ahora…";
+"Update Marker automatically" = "Actualizar Marker automáticamente";
+"Capture" = "Captura";
+"Copy selections to the clipboard" = "Copiar selecciones al portapapeles";
+"Every selection is ready to ⌘V; off keeps it in Marker's history only." = "Cada selección queda lista para ⌘V; desactivado, solo se guarda en el historial de Marker.";
+"Ignore selections you immediately edit" = "Ignorar selecciones que editas de inmediato";
+"Typing over a fresh selection cancels its capture." = "Escribir sobre una selección reciente cancela su captura.";
+"Never save secrets" = "No guardar nunca secretos";
+"Keys and tokens reach the clipboard but stay out of history." = "Las claves y tokens llegan al portapapeles, pero no al historial.";
+"Paste" = "Pegado";
+"Middle-click pastes the latest selection" = "El clic central pega la última selección";
+"Works over text fields; clicks anywhere else pass through untouched." = "Funciona sobre campos de texto; los clics en otros lugares pasan sin cambios.";
+"Three-finger tap pastes the latest selection" = "El toque con tres dedos pega la última selección";
+"The trackpad equivalent of middle-click. Experimental." = "El equivalente del clic central en el trackpad. Experimental.";
+"Interface" = "Interfaz";
+"Show a popup on capture" = "Mostrar un aviso al capturar";
+"Start at login" = "Abrir al iniciar sesión";
+"History" = "Historial";
+"Remove every captured selection" = "Eliminar todas las selecciones capturadas";
+"Clear History…" = "Borrar historial…";
+"Website" = "Sitio web";
+"Privacy Policy" = "Privacidad";
+
+/* History popover */
+"Search" = "Buscar";
+"Filter" = "Filtro";
+"All Apps" = "Todas las apps";
+"Filter by app" = "Filtrar por app";
+"Today" = "Hoy";
+"Yesterday" = "Ayer";
+"One permission needed" = "Se necesita un permiso";
+"Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker lee las selecciones mediante la accesibilidad de macOS. Nada sale de tu Mac.";
+"Open System Settings" = "Abrir Ajustes del Sistema";
+"Nothing here yet" = "Aún no hay nada";
+"Select text in any app — it lands here, already copied." = "Selecciona texto en cualquier app: llega aquí, ya copiado.";
+"No matches" = "Sin resultados";
+"Nothing selected like that. Try fewer letters or another app filter." = "No se seleccionó nada así. Prueba con menos letras u otro filtro de app.";
+"⌥V pastes latest" = "⌥V pega la última";
+"Copy" = "Copiar";
+"Delete" = "Eliminar";
+"Copies this selection" = "Copia esta selección";
+
+/* Toast */
+"· copied from" = "· copiado de";
+
+/* Self-installer alert */
+"Move Marker to the Applications folder?" = "¿Mover Marker a la carpeta Aplicaciones?";
+"Marker will move itself to Applications and relaunch from there." = "Marker se moverá a Aplicaciones y se reiniciará desde allí.";
+"Move to Applications" = "Mover a Aplicaciones";
+"Not Now" = "Ahora no";
+
+/* Settings – ⌘C fallback */
+"Fall back to ⌘C on web pages and Electron apps" = "Recurrir a ⌘C en páginas web y apps Electron";
+"Keeps real formatting from web content." = "Conserva el formato real del contenido web.";
+"Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard." = "Los navegadores y las apps web (Slack, Discord, …) solo exponen su formato mediante su propio comando Copiar. Cuando seleccionas texto ahí, Marker pulsa brevemente ⌘C por ti, toma la copia con formato y restaura tu portapapeles.";
+"More about this setting" = "Más sobre este ajuste";
+
+/* Settings – history retention */
+"Keep history for" = "Conservar historial";
+"Forever" = "Para siempre";
+"7 days" = "7 días";
+"30 days" = "30 días";
+"90 days" = "90 días";

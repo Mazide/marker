@@ -19,6 +19,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp .build/release/Marker "$APP/Contents/MacOS/Marker"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
 
 # Embed Sparkle (SPM binary artifact) and point the executable at it.
 SPARKLE_FW="$(find .build/artifacts -name Sparkle.framework -type d | head -1)"

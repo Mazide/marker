@@ -1,0 +1,67 @@
+/* Settings */
+"Settings" = "Réglages";
+"Updates" = "Mises à jour";
+"Version %@" = "Version %@";
+"Check Now…" = "Rechercher…";
+"Update Marker automatically" = "Mettre à jour Marker automatiquement";
+"Capture" = "Capture";
+"Copy selections to the clipboard" = "Copier les sélections dans le presse-papiers";
+"Every selection is ready to ⌘V; off keeps it in Marker's history only." = "Chaque sélection est prête pour ⌘V ; désactivé, elle reste uniquement dans l'historique de Marker.";
+"Ignore selections you immediately edit" = "Ignorer les sélections aussitôt modifiées";
+"Typing over a fresh selection cancels its capture." = "Taper par-dessus une sélection récente annule sa capture.";
+"Never save secrets" = "Ne jamais enregistrer les secrets";
+"Keys and tokens reach the clipboard but stay out of history." = "Les clés et jetons atteignent le presse-papiers mais restent hors de l'historique.";
+"Paste" = "Collage";
+"Middle-click pastes the latest selection" = "Le clic du milieu colle la dernière sélection";
+"Works over text fields; clicks anywhere else pass through untouched." = "Fonctionne au-dessus des champs de texte ; les clics ailleurs passent sans modification.";
+"Three-finger tap pastes the latest selection" = "Le toucher à trois doigts colle la dernière sélection";
+"The trackpad equivalent of middle-click. Experimental." = "L'équivalent trackpad du clic du milieu. Expérimental.";
+"Interface" = "Interface";
+"Show a popup on capture" = "Afficher une notification à la capture";
+"Start at login" = "Ouvrir à l'ouverture de session";
+"History" = "Historique";
+"Remove every captured selection" = "Supprimer toutes les sélections capturées";
+"Clear History…" = "Effacer l'historique…";
+"Website" = "Site web";
+"Privacy Policy" = "Confidentialité";
+
+/* History popover */
+"Search" = "Rechercher";
+"Filter" = "Filtre";
+"All Apps" = "Toutes les apps";
+"Filter by app" = "Filtrer par app";
+"Today" = "Aujourd'hui";
+"Yesterday" = "Hier";
+"One permission needed" = "Une autorisation requise";
+"Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker lit les sélections via l'accessibilité de macOS. Rien ne quitte votre Mac.";
+"Open System Settings" = "Ouvrir Réglages Système";
+"Nothing here yet" = "Rien ici pour l'instant";
+"Select text in any app — it lands here, already copied." = "Sélectionnez du texte dans n'importe quelle app — il arrive ici, déjà copié.";
+"No matches" = "Aucun résultat";
+"Nothing selected like that. Try fewer letters or another app filter." = "Aucune sélection ne correspond. Essayez moins de lettres ou un autre filtre d'app.";
+"⌥V pastes latest" = "⌥V colle la dernière";
+"Copy" = "Copier";
+"Delete" = "Supprimer";
+"Copies this selection" = "Copie cette sélection";
+
+/* Toast */
+"· copied from" = "· copié depuis";
+
+/* Self-installer alert */
+"Move Marker to the Applications folder?" = "Déplacer Marker dans le dossier Applications ?";
+"Marker will move itself to Applications and relaunch from there." = "Marker se déplacera dans Applications et se relancera depuis ce dossier.";
+"Move to Applications" = "Déplacer dans Applications";
+"Not Now" = "Plus tard";
+
+/* Settings – ⌘C fallback */
+"Fall back to ⌘C on web pages and Electron apps" = "Recourir à ⌘C sur les pages web et les apps Electron";
+"Keeps real formatting from web content." = "Conserve la vraie mise en forme du contenu web.";
+"Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard." = "Les navigateurs et les apps web (Slack, Discord, …) n'exposent leur mise en forme que via leur propre commande Copier. Quand vous y sélectionnez du texte, Marker appuie brièvement sur ⌘C pour vous, récupère la copie mise en forme puis restaure votre presse-papiers.";
+"More about this setting" = "En savoir plus sur ce réglage";
+
+/* Settings – history retention */
+"Keep history for" = "Conserver l'historique";
+"Forever" = "Toujours";
+"7 days" = "7 jours";
+"30 days" = "30 jours";
+"90 days" = "90 jours";

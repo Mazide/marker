@@ -1,0 +1,67 @@
+/* Settings */
+"Settings" = "Settings";
+"Updates" = "Updates";
+"Version %@" = "Version %@";
+"Check Now…" = "Check Now…";
+"Update Marker automatically" = "Update Marker automatically";
+"Capture" = "Capture";
+"Copy selections to the clipboard" = "Copy selections to the clipboard";
+"Every selection is ready to ⌘V; off keeps it in Marker's history only." = "Every selection is ready to ⌘V; off keeps it in Marker's history only.";
+"Ignore selections you immediately edit" = "Ignore selections you immediately edit";
+"Typing over a fresh selection cancels its capture." = "Typing over a fresh selection cancels its capture.";
+"Never save secrets" = "Never save secrets";
+"Keys and tokens reach the clipboard but stay out of history." = "Keys and tokens reach the clipboard but stay out of history.";
+"Paste" = "Paste";
+"Middle-click pastes the latest selection" = "Middle-click pastes the latest selection";
+"Works over text fields; clicks anywhere else pass through untouched." = "Works over text fields; clicks anywhere else pass through untouched.";
+"Three-finger tap pastes the latest selection" = "Three-finger tap pastes the latest selection";
+"The trackpad equivalent of middle-click. Experimental." = "The trackpad equivalent of middle-click. Experimental.";
+"Interface" = "Interface";
+"Show a popup on capture" = "Show a popup on capture";
+"Start at login" = "Start at login";
+"History" = "History";
+"Remove every captured selection" = "Remove every captured selection";
+"Clear History…" = "Clear History…";
+"Website" = "Website";
+"Privacy Policy" = "Privacy Policy";
+
+/* History popover */
+"Search" = "Search";
+"Filter" = "Filter";
+"All Apps" = "All Apps";
+"Filter by app" = "Filter by app";
+"Today" = "Today";
+"Yesterday" = "Yesterday";
+"One permission needed" = "One permission needed";
+"Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker reads selections through macOS Accessibility. Nothing leaves your Mac.";
+"Open System Settings" = "Open System Settings";
+"Nothing here yet" = "Nothing here yet";
+"Select text in any app — it lands here, already copied." = "Select text in any app — it lands here, already copied.";
+"No matches" = "No matches";
+"Nothing selected like that. Try fewer letters or another app filter." = "Nothing selected like that. Try fewer letters or another app filter.";
+"⌥V pastes latest" = "⌥V pastes latest";
+"Copy" = "Copy";
+"Delete" = "Delete";
+"Copies this selection" = "Copies this selection";
+
+/* Toast */
+"· copied from" = "· copied from";
+
+/* Self-installer alert */
+"Move Marker to the Applications folder?" = "Move Marker to the Applications folder?";
+"Marker will move itself to Applications and relaunch from there." = "Marker will move itself to Applications and relaunch from there.";
+"Move to Applications" = "Move to Applications";
+"Not Now" = "Not Now";
+
+/* Settings – ⌘C fallback */
+"Fall back to ⌘C on web pages and Electron apps" = "Fall back to ⌘C on web pages and Electron apps";
+"Keeps real formatting from web content." = "Keeps real formatting from web content.";
+"Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard." = "Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard.";
+"More about this setting" = "More about this setting";
+
+/* Settings – history retention */
+"Keep history for" = "Keep history for";
+"Forever" = "Forever";
+"7 days" = "7 days";
+"30 days" = "30 days";
+"90 days" = "90 days";

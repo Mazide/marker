@@ -1,0 +1,67 @@
+/* Settings */
+"Settings" = "設定";
+"Updates" = "アップデート";
+"Version %@" = "バージョン %@";
+"Check Now…" = "今すぐ確認…";
+"Update Marker automatically" = "Marker を自動的にアップデート";
+"Capture" = "キャプチャ";
+"Copy selections to the clipboard" = "選択テキストをクリップボードにコピー";
+"Every selection is ready to ⌘V; off keeps it in Marker's history only." = "選択したテキストはすぐ⌘Vで貼り付けられます。オフにするとMarkerの履歴にのみ残ります。";
+"Ignore selections you immediately edit" = "すぐに編集した選択は無視";
+"Typing over a fresh selection cancels its capture." = "選択直後に入力するとキャプチャは取り消されます。";
+"Never save secrets" = "シークレットを保存しない";
+"Keys and tokens reach the clipboard but stay out of history." = "キーやトークンはクリップボードには入りますが、履歴には残りません。";
+"Paste" = "ペースト";
+"Middle-click pastes the latest selection" = "中クリックで最新の選択をペースト";
+"Works over text fields; clicks anywhere else pass through untouched." = "テキストフィールド上でのみ動作します。それ以外の場所のクリックはそのまま通過します。";
+"Three-finger tap pastes the latest selection" = "3 本指タップで最新の選択をペースト";
+"The trackpad equivalent of middle-click. Experimental." = "中クリックのトラックパッド版です。実験的機能。";
+"Interface" = "インターフェイス";
+"Show a popup on capture" = "キャプチャ時にポップアップを表示";
+"Start at login" = "ログイン時に起動";
+"History" = "履歴";
+"Remove every captured selection" = "キャプチャした選択をすべて削除";
+"Clear History…" = "履歴を消去…";
+"Website" = "ウェブサイト";
+"Privacy Policy" = "プライバシーポリシー";
+
+/* History popover */
+"Search" = "検索";
+"Filter" = "フィルタ";
+"All Apps" = "すべてのアプリ";
+"Filter by app" = "アプリで絞り込む";
+"Today" = "今日";
+"Yesterday" = "昨日";
+"One permission needed" = "許可が 1 つ必要です";
+"Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker は macOS のアクセシビリティ機能で選択テキストを読み取ります。データが Mac の外に出ることはありません。";
+"Open System Settings" = "システム設定を開く";
+"Nothing here yet" = "まだ何もありません";
+"Select text in any app — it lands here, already copied." = "どのアプリでもテキストを選択すると、コピー済みの状態でここに表示されます。";
+"No matches" = "一致なし";
+"Nothing selected like that. Try fewer letters or another app filter." = "該当する選択はありません。文字数を減らすか、別のアプリフィルタをお試しください。";
+"⌥V pastes latest" = "⌥V で最新をペースト";
+"Copy" = "コピー";
+"Delete" = "削除";
+"Copies this selection" = "この選択をコピーします";
+
+/* Toast */
+"· copied from" = "· コピー元：";
+
+/* Self-installer alert */
+"Move Marker to the Applications folder?" = "Marker を「アプリケーション」フォルダに移動しますか？";
+"Marker will move itself to Applications and relaunch from there." = "Marker は自身を「アプリケーション」に移動し、そこから再起動します。";
+"Move to Applications" = "「アプリケーション」に移動";
+"Not Now" = "後で";
+
+/* Settings – ⌘C fallback */
+"Fall back to ⌘C on web pages and Electron apps" = "WebページとElectronアプリでは⌘Cにフォールバック";
+"Keeps real formatting from web content." = "Webコンテンツの本来の書式を保持します。";
+"Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard." = "ブラウザやWebベースのアプリ(Slack、Discordなど)は、書式を自身のコピーコマンドでしか提供しません。そこでテキストを選択すると、Markerが一瞬⌘Cを送信して書式付きコピーを取得し、クリップボードを元に戻します。";
+"More about this setting" = "この設定について";
+
+/* Settings – history retention */
+"Keep history for" = "履歴の保持期間";
+"Forever" = "無期限";
+"7 days" = "7日";
+"30 days" = "30日";
+"90 days" = "90日";

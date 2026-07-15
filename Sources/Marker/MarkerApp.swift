@@ -1,5 +1,9 @@
 import SwiftUI
 
+/*
+Marker
+Select text. It's already copied.
+*/
 @main
 struct MarkerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -20,7 +24,9 @@ struct MarkerApp: App {
             SettingsView()
         }
     }
+}
 
+extension MarkerApp {
     /// Mono glyph of the app icon (highlight stripe + I-beam), drawn in
     /// code for a clean alpha channel. Template image so the menu bar
     /// tints it for light/dark and inactive states.
