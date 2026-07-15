@@ -52,8 +52,8 @@ private struct GeneralSettingsView: View {
                     isOn: Bindable(model).skipSecretsEnabled
                 )
                 SettingToggle(
-                    "Keep formatting from web pages",
-                    caption: "Browsers and web-based apps expose formatting only through their own Copy. After a selection there, Marker briefly presses ⌘C for you and then restores your clipboard.",
+                    "Fall back to ⌘C on web pages and Electron apps",
+                    caption: "Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard.",
                     isOn: Bindable(model).richCopyEnabled
                 )
             }
