@@ -66,6 +66,15 @@ final class AppModel {
         didSet { UserDefaults.standard.set(skipSecretsEnabled, forKey: "skipSecretsEnabled") }
     }
 
+    /// Rich capture through a synthesized ⌘C in browsers and web views,
+    /// where the Accessibility read carries almost no formatting.
+    var richCopyEnabled: Bool = UserDefaults.standard.object(forKey: "richCopyEnabled") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(richCopyEnabled, forKey: "richCopyEnabled")
+            engine.richViaCopyEnabled = richCopyEnabled
+        }
+    }
+
     /// 0 = keep forever (default: history is unencrypted on disk, see README,
     /// so this is opt-in, not a silent default).
     var historyRetentionDays: Int = UserDefaults.standard.object(forKey: "historyRetentionDays") as? Int ?? 0 {
@@ -120,6 +129,7 @@ final class AppModel {
             self?.engine.keyDown(isSelectionIntent: isIntent, isPlainTyping: isTyping)
         }
         engine.retractionEnabled = retractEditedEnabled
+        engine.richViaCopyEnabled = richCopyEnabled
         mouseMonitor.onMouseDown = { [weak self] shiftClick in
             self?.engine.mouseDown(shiftClick: shiftClick)
         }

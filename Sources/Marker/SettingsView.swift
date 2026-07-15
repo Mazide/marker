@@ -51,6 +51,11 @@ private struct GeneralSettingsView: View {
                     caption: "API keys, tokens and private keys still reach your clipboard, but are kept out of history.",
                     isOn: Bindable(model).skipSecretsEnabled
                 )
+                SettingToggle(
+                    "Keep formatting from web pages",
+                    caption: "Browsers and web-based apps expose formatting only through their own Copy. After a selection there, Marker briefly presses ⌘C for you and then restores your clipboard.",
+                    isOn: Bindable(model).richCopyEnabled
+                )
             }
 
             Section("Paste") {

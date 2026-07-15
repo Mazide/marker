@@ -30,6 +30,19 @@ final class CaptureEngine {
         var clickQuiet: TimeInterval = 1.5
     }
 
+    /// Browsers: their AX attributed reads are near-empty (Chromium
+    /// reports colors only and glues paragraphs together), but their own
+    /// Cmd+C puts the real HTML on the pasteboard — mouse selections in
+    /// these apps capture via synthesized copy, with the AX text as a
+    /// backstop when the page suppresses copying.
+    static let richViaCopyApps: Set<String> = [
+        "com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary",
+        "com.apple.Safari", "com.apple.SafariTechnologyPreview",
+        "org.mozilla.firefox", "com.microsoft.edgemac", "com.brave.Browser",
+        "com.vivaldi.Vivaldi", "com.operasoftware.Opera", "company.thebrowser.Browser",
+        "org.chromium.Chromium",
+    ]
+
     /// Element roles where a drag is not a text selection.
     static let nonTextRoles: Set<String> = [
         "AXScrollBar", "AXSlider", "AXButton", "AXMenuItem", "AXMenu",
@@ -40,6 +53,9 @@ final class CaptureEngine {
     var onCapture: ((_ content: RichText, _ app: SourceApp, _ viaAX: Bool) -> Void)?
     /// Delay-and-drop select-to-edit filtering for editable fields.
     var retractionEnabled = true
+    /// Rich capture through a synthesized ⌘C in browsers and web views
+    /// (their AX attributed reads are near-empty). Off: AX-only capture.
+    var richViaCopyEnabled = true
 
     private let selection: SelectionReading
     private let pasteboard: PasteboardControlling
@@ -190,6 +206,18 @@ final class CaptureEngine {
     }
 
     private func resolveGesture(app: SourceApp, downCount: Int) {
+        // Browsers and other web-content hosts: the AX read only confirms
+        // the gesture selected text; the flavors (and a plain text with
+        // real line breaks) come from the app's own copy.
+        if capturesViaCopy(app),
+           let text = selection.currentSelection() {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, trimmed != downSelection {
+                fallbackCopy(app: app, backstop: text)
+                return
+            }
+        }
+
         // Trust the AX read only when this gesture changed it; an AX text
         // identical to the mouse-down snapshot is a focused field's old
         // selection, not the drag's result. Stale or deduped: keep going —
@@ -229,17 +257,29 @@ final class CaptureEngine {
         fallbackCopy(app: app)
     }
 
+    /// Whether rich content for this app comes from a synthesized copy
+    /// rather than the AX attributed read.
+    private func capturesViaCopy(_ app: SourceApp) -> Bool {
+        guard richViaCopyEnabled else { return false }
+        if Self.richViaCopyApps.contains(app.bundleID) { return true }
+        // Web content hosted outside a browser (Electron, WKWebView apps)
+        // has the same near-empty AX attributes and the same safe Cmd+C.
+        return selection.focusedElementRole() == "AXWebArea"
+    }
+
     /// Synthesize Cmd+C, poll for the clipboard to change, grab the text,
-    /// restore the previous contents.
-    private func fallbackCopy(app: SourceApp) {
+    /// restore the previous contents. `backstop` is an already-confirmed
+    /// AX selection to commit if the copy never lands (page suppresses
+    /// Cmd+C) — plain beats losing the capture.
+    private func fallbackCopy(app: SourceApp, backstop: String? = nil) {
         markerLog.debug("fallback Cmd+C for \(app.name, privacy: .public)")
         let before = pasteboard.changeCount
         let saved = pasteboard.snapshot()
         keys.postCopy()
-        poll(app: app, before: before, saved: saved, attemptsLeft: config.pollAttempts)
+        poll(app: app, before: before, saved: saved, attemptsLeft: config.pollAttempts, backstop: backstop)
     }
 
-    private func poll(app: SourceApp, before: Int, saved: PasteboardSnapshot, attemptsLeft: Int) {
+    private func poll(app: SourceApp, before: Int, saved: PasteboardSnapshot, attemptsLeft: Int, backstop: String?) {
         scheduler.schedule(after: config.pollInterval) { [weak self] in
             guard let self else { return }
             if self.pasteboard.changeCount != before {
@@ -249,12 +289,17 @@ final class CaptureEngine {
                 if let content {
                     markerLog.info("fallback captured \(content.plain.count) chars")
                     self.captureFromGesture(content.plain, app: app, viaAX: false, flavors: content)
+                } else if let backstop {
+                    self.captureFromGesture(backstop, app: app, viaAX: true)
                 }
             } else if attemptsLeft > 0 {
-                self.poll(app: app, before: before, saved: saved, attemptsLeft: attemptsLeft - 1)
+                self.poll(app: app, before: before, saved: saved, attemptsLeft: attemptsLeft - 1, backstop: backstop)
             } else {
                 // Nothing was copied; clipboard untouched, nothing to restore.
                 markerLog.debug("fallback: clipboard never changed")
+                if let backstop {
+                    self.captureFromGesture(backstop, app: app, viaAX: true)
+                }
             }
         }
     }
@@ -298,12 +343,15 @@ final class CaptureEngine {
         if let flavors {
             content.rtf = flavors.rtf
             content.html = flavors.html
-        } else if viaAX, let rich = selection.currentSelectionRich(),
-                  rich.plain == text {
+        } else if viaAX, let rich = selection.currentSelectionRich() {
             // Attach only when the attributed read describes the same text;
             // a mismatch means the selection moved on — plain is the truth.
-            content.rtf = rich.rtf
-            content.html = rich.html
+            if rich.plain == text {
+                content.rtf = rich.rtf
+                content.html = rich.html
+            } else {
+                markerLog.info("rich: plain mismatch, ax=\(text.count) rich=\(rich.plain.count)")
+            }
         }
 
         // Editable fields: hold the commit briefly. Typing in the window

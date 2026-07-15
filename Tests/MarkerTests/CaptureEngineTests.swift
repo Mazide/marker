@@ -224,11 +224,12 @@ final class CaptureEngineTests: XCTestCase {
     }
 
     func testContentCaptureStillProvesApp() {
-        // A read-only AX capture (browser page) proves the app: later
-        // empty drags must not synthesize Cmd+C.
+        // A read-only AX capture (native document view) proves the app:
+        // later empty drags must not synthesize Cmd+C. (AXWebArea would
+        // route through the synthesized-copy path instead.)
         engine.mouseDown()
         reader.selection = "page text"
-        reader.focusedRole = "AXWebArea"
+        reader.focusedRole = "AXStaticText"
         engine.selectionGesture()
         scheduler.runAll()
 
@@ -312,6 +313,97 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertFalse(captures[0].viaAX)
         XCTAssertEqual(pasteboard.current, "user's clipboard", "clipboard must be restored")
         XCTAssertEqual(keys.copyCount, 0)
+    }
+
+    // MARK: - Gesture: browsers capture via synthesized copy
+
+    func testBrowserGestureCapturesViaCopyNotAX() {
+        frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
+        pasteboard.externalWrite("user's clipboard")
+        let html = "<p>real <a href=\"x\">html</a></p>"
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("real\nparagraphs", html: html)
+        }
+
+        engine.mouseDown()
+        reader.selection = "realparagraphs" // Chromium AX glues blocks
+        reader.richSelection = RichText(plain: "realparagraphs", rtf: Data("weak".utf8))
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 1, "browser selection must copy for real flavors")
+        XCTAssertEqual(capturedContents.count, 1)
+        XCTAssertEqual(capturedContents[0].plain, "real\nparagraphs")
+        XCTAssertEqual(capturedContents[0].html, html)
+        XCTAssertFalse(captures[0].viaAX)
+        XCTAssertEqual(pasteboard.current, "user's clipboard")
+    }
+
+    func testBrowserGestureFallsBackToAXWhenCopySuppressed() {
+        frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
+        pasteboard.externalWrite("user's clipboard")
+
+        engine.mouseDown()
+        reader.selection = "page blocks copy"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 1)
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures[0].text, "page blocks copy")
+        XCTAssertTrue(captures[0].viaAX, "backstop is the AX read")
+        XCTAssertEqual(pasteboard.current, "user's clipboard")
+    }
+
+    func testBrowserGestureWithoutSelectionDoesNotCopy() {
+        frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
+        // Prove AX first so the generic fallback is off for this app.
+        engine.mouseDown()
+        reader.selection = "prove ax"
+        engine.selectionGesture()
+        scheduler.runAll()
+        keys.copyCount = 0
+
+        reader.selection = nil
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 0, "no selection, no synthesized copy")
+        XCTAssertEqual(captures.count, 1)
+    }
+
+    func testDisabledRichCopyCapturesViaAXOnly() {
+        engine.richViaCopyEnabled = false
+        frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
+
+        engine.mouseDown()
+        reader.selection = "page text"
+        reader.focusedRole = "AXWebArea"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 0, "toggle off must mean no synthesized copies")
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures[0].text, "page text")
+        XCTAssertTrue(captures[0].viaAX)
+    }
+
+    func testWebAreaFocusCapturesViaCopy() {
+        frontmost.app = SourceApp(pid: 9, bundleID: "com.example.electron", name: "Electron", isSelf: false)
+        reader.focusedRole = "AXWebArea"
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("web text", html: "<i>web text</i>")
+        }
+
+        engine.mouseDown()
+        reader.selection = "web text"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.copyCount, 1, "web content must capture via copy without a bundle-list entry")
+        XCTAssertEqual(capturedContents.count, 1)
+        XCTAssertEqual(capturedContents[0].html, "<i>web text</i>")
     }
 
     // MARK: - Gesture: Cmd+C fallback
@@ -565,7 +657,9 @@ final class CaptureEngineTests: XCTestCase {
     }
 
     func testReadOnlyContextCommitsInstantly() {
-        gestureCapture("article text", focusedRole: "AXWebArea")
+        // AXWebArea would route through the synthesized-copy path now;
+        // any other read-only role commits straight from the AX read.
+        gestureCapture("article text", focusedRole: "AXStaticText")
         scheduler.runNext() // settle job only
 
         XCTAssertEqual(captures.count, 1, "no delay outside editable fields")

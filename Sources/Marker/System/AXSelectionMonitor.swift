@@ -186,33 +186,23 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
     /// stores. Returns nil when the app exposes no attributed text or no
     /// run carries an attribute we can translate.
     private func richSelectedText(of element: AXUIElement) -> RichText? {
-        var rangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            kAXSelectedTextRangeAttribute as CFString,
-            &rangeRef
-        ) == .success,
-              let rangeRef,
-              CFGetTypeID(rangeRef) == AXValueGetTypeID()
-        else { return nil }
-
-        var range = CFRange()
-        guard AXValueGetValue(rangeRef as! AXValue, .cfRange, &range),
-              range.length > 0, range.length <= 200_000
-        else { return nil }
-
-        var attrRef: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(
-            element,
-            "AXAttributedStringForRange" as CFString,
-            rangeRef,
-            &attrRef
-        ) == .success,
-              let axString = attrRef as? NSAttributedString,
-              axString.length > 0
-        else { return nil }
-
-        guard let display = displayAttributed(from: axString) else { return nil }
+        var display: NSAttributedString?
+        if let axString = rangeAttributedSelection(of: element) {
+            display = displayAttributed(from: axString)
+            if display == nil {
+                markerLog.info("rich: range read untranslatable, keys=\(Self.attributeKeys(of: axString), privacy: .public)")
+            }
+        }
+        // Chromium's AXAttributedStringForRange drops all attributes once
+        // the selection crosses text nodes; the WebKit-style text-marker
+        // read keeps them.
+        if display == nil, let axString = markerAttributedSelection(of: element) {
+            display = displayAttributed(from: axString)
+            if display == nil {
+                markerLog.info("rich: marker read untranslatable, keys=\(Self.attributeKeys(of: axString), privacy: .public)")
+            }
+        }
+        guard let display else { return nil }
 
         let plain = display.string
         let trimmedPlain = plain.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -220,7 +210,10 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
         var trimmed = display
         if trimmedPlain != plain {
             let trimRange = (plain as NSString).range(of: trimmedPlain)
-            guard trimRange.location != NSNotFound else { return nil }
+            guard trimRange.location != NSNotFound else {
+                markerLog.info("rich: trim lost the plain text")
+                return nil
+            }
             trimmed = display.attributedSubstring(from: trimRange)
         }
 
@@ -242,8 +235,92 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
            let html = String(data: htmlData, encoding: .utf8) {
             content.html = html
         }
-        guard content.hasFlavors else { return nil }
+        guard content.hasFlavors else {
+            markerLog.info("rich: serialization produced no flavors (len=\(trimmed.length))")
+            return nil
+        }
         return content
+    }
+
+    /// Attributed selection via AXAttributedStringForRange — the classic
+    /// per-element read; nil when the app exposes no range or no string.
+    private func rangeAttributedSelection(of element: AXUIElement) -> NSAttributedString? {
+        var rangeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &rangeRef
+        ) == .success,
+              let rangeRef,
+              CFGetTypeID(rangeRef) == AXValueGetTypeID()
+        else {
+            markerLog.info("rich: no AXSelectedTextRange")
+            return nil
+        }
+
+        var range = CFRange()
+        guard AXValueGetValue(rangeRef as! AXValue, .cfRange, &range),
+              range.length > 0, range.length <= 200_000
+        else {
+            markerLog.info("rich: bad range length=\(range.length)")
+            return nil
+        }
+
+        var attrRef: CFTypeRef?
+        let attrErr = AXUIElementCopyParameterizedAttributeValue(
+            element,
+            "AXAttributedStringForRange" as CFString,
+            rangeRef,
+            &attrRef
+        )
+        guard attrErr == .success,
+              let axString = attrRef as? NSAttributedString,
+              axString.length > 0
+        else {
+            markerLog.info("rich: AXAttributedStringForRange err=\(attrErr.rawValue)")
+            return nil
+        }
+        return axString
+    }
+
+    /// WebKit-style attributed selection via AXSelectedTextMarkerRange +
+    /// AXAttributedStringForTextMarkerRange (Safari, Chromium web areas).
+    private func markerAttributedSelection(of element: AXUIElement) -> NSAttributedString? {
+        var markerRangeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            "AXSelectedTextMarkerRange" as CFString,
+            &markerRangeRef
+        ) == .success, let markerRangeRef else {
+            markerLog.info("rich: no AXSelectedTextMarkerRange")
+            return nil
+        }
+
+        var attrRef: CFTypeRef?
+        let attrErr = AXUIElementCopyParameterizedAttributeValue(
+            element,
+            "AXAttributedStringForTextMarkerRange" as CFString,
+            markerRangeRef,
+            &attrRef
+        )
+        guard attrErr == .success,
+              let axString = attrRef as? NSAttributedString,
+              axString.length > 0
+        else {
+            markerLog.info("rich: AXAttributedStringForTextMarkerRange err=\(attrErr.rawValue)")
+            return nil
+        }
+        return axString
+    }
+
+    private static func attributeKeys(of axString: NSAttributedString) -> String {
+        var keys = Set<String>()
+        axString.enumerateAttributes(
+            in: NSRange(location: 0, length: axString.length)
+        ) { attributes, _, _ in
+            for key in attributes.keys { keys.insert(key.rawValue) }
+        }
+        return keys.sorted().joined(separator: ",")
     }
 
     /// AX attributed strings carry AX-specific keys, not display keys —
