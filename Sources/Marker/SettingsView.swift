@@ -38,22 +38,23 @@ private struct GeneralSettingsView: View {
             Section("Capture") {
                 SettingToggle(
                     "Copy selections to the clipboard",
-                    caption: "Every selection lands on the system clipboard, ready to ⌘V. Off: selections stay in Marker's history only, and ⌥V pastes the latest.",
+                    caption: "Every selection is ready to ⌘V; off keeps it in Marker's history only.",
                     isOn: Bindable(model).copyToClipboardEnabled
                 )
                 SettingToggle(
                     "Ignore selections you immediately edit",
-                    caption: "In editable fields Marker waits half a second before saving. Type over the selection in that window and nothing is captured.",
+                    caption: "Typing over a fresh selection cancels its capture.",
                     isOn: Bindable(model).retractEditedEnabled
                 )
                 SettingToggle(
                     "Never save secrets",
-                    caption: "API keys, tokens and private keys still reach your clipboard, but are kept out of history.",
+                    caption: "Keys and tokens reach the clipboard but stay out of history.",
                     isOn: Bindable(model).skipSecretsEnabled
                 )
                 SettingToggle(
                     "Fall back to ⌘C on web pages and Electron apps",
-                    caption: "Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard.",
+                    caption: "Keeps real formatting from web content.",
+                    detail: "Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard.",
                     isOn: Bindable(model).richCopyEnabled
                 )
             }
@@ -110,20 +111,47 @@ private struct GeneralSettingsView: View {
 /// Settings does it — a separate caption row splits the form into
 /// alternating stripes.
 private struct SettingToggle: View {
-    let title: String
-    let caption: String
+    let title: LocalizedStringKey
+    let caption: LocalizedStringKey
+    let detail: LocalizedStringKey?
     @Binding var isOn: Bool
+    @State private var showingDetail = false
 
-    init(_ title: String, caption: String, isOn: Binding<Bool>) {
+    init(
+        _ title: LocalizedStringKey,
+        caption: LocalizedStringKey,
+        detail: LocalizedStringKey? = nil,
+        isOn: Binding<Bool>
+    ) {
         self.title = title
         self.caption = caption
+        self.detail = detail
         self._isOn = isOn
     }
 
     var body: some View {
         Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                HStack(spacing: 4) {
+                    Text(title)
+                    if let detail {
+                        Button {
+                            showingDetail = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("More about this setting")
+                        .popover(isPresented: $showingDetail, arrowEdge: .bottom) {
+                            Text(detail)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: 280)
+                                .padding()
+                        }
+                    }
+                }
                 Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
