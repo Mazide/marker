@@ -4,8 +4,10 @@ import AppKit
 /// same mechanism apps like Middle use). Loaded with dlopen/dlsym so
 /// nothing links against the private framework at build time; if the
 /// framework or symbols are missing the monitor silently does nothing.
-/// Serves both paste gestures: a live finger count for the click mode
-/// and a double-tap detector fed from the frame stream.
+/// Only the per-frame finger COUNT is read — touch struct layouts vary
+/// between macOS versions, so we never parse them. Serves both paste
+/// gestures: a live finger count for the click mode and a double-tap
+/// detector fed from the frame stream.
 final class TrackpadTapMonitor {
     /// Fires on the main queue when a three-finger double tap completes.
     var onThreeFingerDoubleTap: (() -> Void)?
@@ -68,9 +70,8 @@ final class TrackpadTapMonitor {
         }
         devices = list
 
-        let callback: MTContactCallback = { _, touches, fingers, timestamp, _ in
-            let centroid = TrackpadTapMonitor.centroid(of: touches, count: Int(fingers))
-            TrackpadTapMonitor.shared?.frame(fingers: Int(fingers), centroid: centroid, at: timestamp)
+        let callback: MTContactCallback = { _, _, fingers, timestamp, _ in
+            TrackpadTapMonitor.shared?.frame(fingers: Int(fingers), at: timestamp)
             return 0
         }
 
@@ -82,33 +83,45 @@ final class TrackpadTapMonitor {
         markerLog.info("trackpad monitor started (\(CFArrayGetCount(list)) devices)")
     }
 
-    /// Normalized finger centroid from the classic 96-byte MTTouch layout
-    /// (position floats at offsets 32/36). If Apple ever changes the layout
-    /// the values become garbage; the movement filter then rejects taps, so
-    /// worst case is "feature quietly off", never a crash on our side.
-    private static func centroid(of touches: UnsafeMutableRawPointer?, count: Int) -> (x: Float, y: Float)? {
-        guard let touches, count > 0 else { return nil }
-        let stride = 96
-        var sumX: Float = 0, sumY: Float = 0
-        for index in 0..<count {
-            let base = touches.advanced(by: index * stride)
-            sumX += base.loadUnaligned(fromByteOffset: 32, as: Float.self)
-            sumY += base.loadUnaligned(fromByteOffset: 36, as: Float.self)
-        }
-        let x = sumX / Float(count)
-        let y = sumY / Float(count)
-        guard x.isFinite, y.isFinite else { return nil }
-        return (x, y)
-    }
+    private var debugSessionStart: Double?
+    private var debugMaxFingers = 0
+    private var debugReachedThreeAt: Double?
+    private var debugLastSessionEnd: Double?
 
     // Callback arrives on a MultitouchSupport thread.
-    private func frame(fingers: Int, centroid: (x: Float, y: Float)?, at timestamp: Double) {
+    private func frame(fingers: Int, at timestamp: Double) {
         stateLock.lock()
         fingersDown = fingers
         lastFrameUptime = ProcessInfo.processInfo.systemUptime
         stateLock.unlock()
 
-        if doubleTap.frame(fingers: fingers, centroid: centroid, at: timestamp) {
+        // Debug bookkeeping mirrors the detector so failed taps are visible.
+        if fingers > 0 {
+            if debugSessionStart == nil {
+                debugSessionStart = timestamp
+                debugMaxFingers = 0
+                debugReachedThreeAt = nil
+            }
+            debugMaxFingers = max(debugMaxFingers, fingers)
+            if fingers == 3, debugReachedThreeAt == nil {
+                debugReachedThreeAt = timestamp
+            }
+        } else if let start = debugSessionStart {
+            debugSessionStart = nil
+            if debugMaxFingers >= 3 {
+                let ms = String(format: "%.0f", (timestamp - start) * 1000)
+                let landing = self.debugReachedThreeAt.map {
+                    String(format: "%.0f", ($0 - start) * 1000)
+                } ?? "-"
+                let gap = self.debugLastSessionEnd.map {
+                    String(format: "%.0f", (timestamp - $0) * 1000)
+                } ?? "-"
+                markerLog.debug("touch session: maxFingers=\(self.debugMaxFingers) duration=\(ms, privacy: .public)ms landing=\(landing, privacy: .public)ms sinceLastSession=\(gap, privacy: .public)ms")
+            }
+            debugLastSessionEnd = timestamp
+        }
+
+        if doubleTap.frame(fingers: fingers, at: timestamp) {
             markerLog.info("three-finger double tap detected")
             DispatchQueue.main.async { [weak self] in
                 self?.onThreeFingerDoubleTap?()
