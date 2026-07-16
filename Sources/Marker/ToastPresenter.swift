@@ -9,8 +9,8 @@ final class ToastPresenter {
     private var panel: NSPanel?
     private var hideTimer: Timer?
 
-    func show(text: String, appName: String, bundleID: String) {
-        present(ToastView(text: snippet(of: text), appName: appName, bundleID: bundleID))
+    func show(text: String, appName: String, bundleID: String, warning: String? = nil) {
+        present(ToastView(text: snippet(of: text), appName: appName, bundleID: bundleID, warning: warning))
     }
 
     /// Attribution for gesture pastes (three-finger click, middle-click):
@@ -156,6 +156,7 @@ private struct ToastView: View {
     let text: String
     let appName: String
     let bundleID: String
+    var warning: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -180,6 +181,11 @@ private struct ToastView: View {
                 .lineLimit(3)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
+            if let warning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.orange)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)

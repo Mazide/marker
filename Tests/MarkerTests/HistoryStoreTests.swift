@@ -114,6 +114,21 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(hits.map(\.text), ["ancient needle"], "search reaches beyond the window")
     }
 
+    func testPushReportsFailedInsertButKeepsItemInMemory() {
+        db.failInserts = true
+
+        let saved = store.push(text: "doomed", app: telegram)
+
+        XCTAssertFalse(saved)
+        XCTAssertEqual(store.items.map(\.text), ["doomed"], "capture stays usable within the session")
+        XCTAssertEqual(db.count(), 0)
+    }
+
+    func testPushNoOpIsNotAFailure() {
+        XCTAssertTrue(store.push(text: "  \n ", app: telegram), "empty selection is skipped, not failed")
+        XCTAssertTrue(store.items.isEmpty)
+    }
+
     func testClearEmptiesStoreAndDatabase() {
         store.push(text: "a", app: telegram)
         store.clear()

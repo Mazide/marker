@@ -135,11 +135,16 @@ final class FakeScheduler: Scheduling {
 
 final class InMemoryHistoryDatabase: HistoryDatabase {
     private(set) var rows: [SelectionItem] = []
+    /// Simulate a database that can no longer be written (locked, full, gone).
+    var failInserts = false
 
-    func insert(_ item: SelectionItem) {
+    @discardableResult
+    func insert(_ item: SelectionItem) -> Bool {
+        guard !failInserts else { return false }
         rows.removeAll { $0.id == item.id }
         rows.append(item)
         rows.sort { $0.date > $1.date }
+        return true
     }
 
     func delete(id: UUID) { rows.removeAll { $0.id == id } }

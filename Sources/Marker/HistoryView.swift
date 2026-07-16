@@ -189,8 +189,21 @@ struct HistoryView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
-            Button {
-                openSettings()
+            Menu {
+                Button("Settings…") {
+                    openSettings()
+                }
+                .keyboardShortcut(",")
+                Button("Check for Updates…") {
+                    model.checkForUpdates()
+                }
+                Divider()
+                // The app has no Dock icon and no main menu (LSUIElement);
+                // without this item there is no way to quit it at all.
+                Button("Quit Marker") {
+                    NSApp.terminate(nil)
+                }
+                .keyboardShortcut("q")
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 13))
@@ -200,9 +213,12 @@ struct HistoryView: View {
                     .frame(width: 28, height: 24)
                     .contentShape(Rectangle())
             }
+            .menuStyle(.button)
             .buttonStyle(.plain)
-            .keyboardShortcut(",")
-            .help("Settings")
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Settings, updates, quit")
+            .accessibilityLabel("Settings and app actions")
         }
         .padding(.leading, 12)
         .padding(.trailing, 6)

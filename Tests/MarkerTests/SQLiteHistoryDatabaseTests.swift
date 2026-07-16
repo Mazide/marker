@@ -153,6 +153,34 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         XCTAssertEqual(db.apps().map(\.bundleID).sorted(), ["com.google.Chrome", "org.telegram"])
     }
 
+    func testInsertReportsSuccess() {
+        XCTAssertTrue(db.insert(item("ok")))
+    }
+
+    func testUsesWALJournalMode() {
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &raw), SQLITE_OK)
+        defer { sqlite3_close(raw) }
+
+        var statement: OpaquePointer?
+        XCTAssertEqual(sqlite3_prepare_v2(raw, "PRAGMA journal_mode", -1, &statement, nil), SQLITE_OK)
+        defer { sqlite3_finalize(statement) }
+        XCTAssertEqual(sqlite3_step(statement), SQLITE_ROW)
+        XCTAssertEqual(String(cString: sqlite3_column_text(statement, 0)), "wal")
+    }
+
+    func testTwoConnectionsCanBothWrite() {
+        // The v0.9.1 field bug: a second instance sharing the file made
+        // writes vanish and history read back empty.
+        let second = SQLiteHistoryDatabase(url: url)
+
+        XCTAssertTrue(db.insert(item("from first", offset: 0)))
+        XCTAssertTrue(second.insert(item("from second", offset: 1)))
+
+        XCTAssertEqual(db.count(), 2)
+        XCTAssertEqual(second.recent(limit: 10, offset: 0).map(\.text), ["from second", "from first"])
+    }
+
     func testPersistsAcrossReopen() {
         db.insert(item("survives"))
         db = nil
