@@ -47,7 +47,9 @@ protocol Scheduling: AnyObject {
 }
 
 protocol HistoryDatabase: AnyObject {
-    func insert(_ item: SelectionItem)
+    /// Returns false when the row could not be written (the caller decides
+    /// how loudly to fail — a capture must never pretend it was persisted).
+    func insert(_ item: SelectionItem) -> Bool
     func delete(id: UUID)
     func deleteAll(text: String)
     func deleteOlderThan(_ date: Date)

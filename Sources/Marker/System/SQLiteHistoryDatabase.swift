@@ -19,8 +19,16 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
     init(url: URL = SQLiteHistoryDatabase.defaultURL()) {
         guard sqlite3_open(url.path, &db) == SQLITE_OK else {
             markerLog.error("sqlite open failed: \(url.path, privacy: .public)")
+            sqlite3_close(db)
+            db = nil
             return
         }
+        // A second connection (a stray second Marker instance, sqlite3 in a
+        // terminal) must not turn into dropped writes or an empty-looking
+        // history: wait out short locks, and WAL lets readers coexist with
+        // the writer instead of failing with SQLITE_BUSY.
+        sqlite3_busy_timeout(db, 5000)
+        exec("PRAGMA journal_mode=WAL")
         exec("""
         CREATE TABLE IF NOT EXISTS items(
             id TEXT PRIMARY KEY,
@@ -43,8 +51,9 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
 
     // MARK: - HistoryDatabase
 
-    func insert(_ item: SelectionItem) {
-        withStatement("""
+    @discardableResult
+    func insert(_ item: SelectionItem) -> Bool {
+        execute("""
         INSERT OR REPLACE INTO items(id, text, text_lc, date, appName, appName_lc, bundleID)
         VALUES(?,?,?,?,?,?,?)
         """) { statement in
@@ -55,28 +64,24 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
             bind(statement, 5, item.appName)
             bind(statement, 6, item.appName.lowercased())
             bind(statement, 7, item.bundleID)
-            sqlite3_step(statement)
         }
     }
 
     func delete(id: UUID) {
-        withStatement("DELETE FROM items WHERE id = ?") { statement in
+        execute("DELETE FROM items WHERE id = ?") { statement in
             bind(statement, 1, id.uuidString)
-            sqlite3_step(statement)
         }
     }
 
     func deleteAll(text: String) {
-        withStatement("DELETE FROM items WHERE text = ?") { statement in
+        execute("DELETE FROM items WHERE text = ?") { statement in
             bind(statement, 1, text)
-            sqlite3_step(statement)
         }
     }
 
     func deleteOlderThan(_ date: Date) {
-        withStatement("DELETE FROM items WHERE date < ?") { statement in
+        execute("DELETE FROM items WHERE date < ?") { statement in
             sqlite3_bind_double(statement, 1, date.timeIntervalSince1970)
-            sqlite3_step(statement)
         }
     }
 
@@ -173,6 +178,23 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
         if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
             markerLog.error("sqlite exec failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
         }
+    }
+
+    /// Run a data-changing statement; true only when it ran to completion.
+    @discardableResult
+    private func execute(_ sql: String, _ bindings: (OpaquePointer?) -> Void) -> Bool {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            markerLog.error("sqlite prepare failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
+            return false
+        }
+        defer { sqlite3_finalize(statement) }
+        bindings(statement)
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            markerLog.error("sqlite step failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
+            return false
+        }
+        return true
     }
 
     private func withStatement(_ sql: String, _ body: (OpaquePointer?) -> Void) {

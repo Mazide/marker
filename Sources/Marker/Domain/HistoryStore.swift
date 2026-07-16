@@ -37,9 +37,12 @@ final class HistoryStore {
         canLoadMore = db.count() > items.count
     }
 
-    func push(text rawText: String, app: SourceApp) {
+    /// Returns false when the item could not be persisted (it stays in the
+    /// in-memory window either way, so the session keeps working).
+    @discardableResult
+    func push(text rawText: String, app: SourceApp) -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, items.first?.text != text else { return }
+        guard !text.isEmpty, items.first?.text != text else { return true }
 
         if let first = items.first,
            first.bundleID == app.bundleID,
@@ -59,7 +62,7 @@ final class HistoryStore {
         items.removeAll { $0.text == text }
         db.deleteAll(text: text)
         items.insert(item, at: 0)
-        db.insert(item)
+        return db.insert(item)
     }
 
     func delete(_ item: SelectionItem) {

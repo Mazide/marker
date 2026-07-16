@@ -9,13 +9,13 @@ final class ToastPresenter {
     private var panel: NSPanel?
     private var hideTimer: Timer?
 
-    func show(text: String, appName: String, bundleID: String) {
+    func show(text: String, appName: String, bundleID: String, warning: String? = nil) {
         let snippet = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n", with: " ")
 
         let hosting = NSHostingView(
-            rootView: ToastView(text: snippet, appName: appName, bundleID: bundleID)
+            rootView: ToastView(text: snippet, appName: appName, bundleID: bundleID, warning: warning)
         )
         var size = hosting.fittingSize
         size.height = min(size.height, 120)
@@ -96,6 +96,7 @@ private struct ToastView: View {
     let text: String
     let appName: String
     let bundleID: String
+    var warning: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -120,6 +121,11 @@ private struct ToastView: View {
                 .lineLimit(3)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
+            if let warning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.orange)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)

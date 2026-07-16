@@ -221,12 +221,17 @@ final class AppModel {
         }
 
         let isNew = history.items.first?.text != text
-        history.push(text: text, app: app)
+        let saved = history.push(text: text, app: app)
         if copyToClipboardEnabled {
             pasteboard.writeString(text)
         }
         if isNew, toastEnabled {
-            ToastPresenter.shared.show(text: text, appName: app.name, bundleID: app.bundleID)
+            ToastPresenter.shared.show(
+                text: text,
+                appName: app.name,
+                bundleID: app.bundleID,
+                warning: saved ? nil : "Couldn't save to history"
+            )
         }
     }
 
