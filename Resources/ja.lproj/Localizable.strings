@@ -14,8 +14,11 @@
 "Paste" = "ペースト";
 "Middle-click pastes the latest selection" = "中クリックで最新の選択をペースト";
 "Works over text fields; clicks anywhere else pass through untouched." = "テキストフィールド上でのみ動作します。それ以外の場所のクリックはそのまま通過します。";
-"Three-finger click pastes the latest selection" = "3 本指クリックで最新の選択をペースト";
-"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "トラックパッドを 3 本指で押し込みます。軽いタップでは反応しません。実験的機能。";
+"Three-finger paste" = "3 本指ペースト";
+"Middle-click for the trackpad: pastes the latest selection. Experimental." = "トラックパッド版の中クリック。最新の選択をペーストします。実験的機能。";
+"Off" = "オフ";
+"Physical click" = "クリック";
+"Double tap" = "ダブルタップ";
 "Interface" = "インターフェイス";
 "Show a popup on capture" = "キャプチャ時にポップアップを表示";
 "Start at login" = "ログイン時に起動";
@@ -69,4 +72,5 @@
 /* Paste toast */
 "· pasted via" = "· 貼り付け:";
 "three-finger click" = "3本指クリック";
+"three-finger double tap" = "3本指ダブルタップ";
 "middle-click" = "中クリック";

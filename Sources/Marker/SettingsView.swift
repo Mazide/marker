@@ -65,11 +65,19 @@ private struct GeneralSettingsView: View {
                     caption: "Works over text fields; clicks anywhere else pass through untouched.",
                     isOn: Bindable(model).middleClickPasteEnabled
                 )
-                SettingToggle(
-                    "Three-finger click pastes the latest selection",
-                    caption: "Press the trackpad with three fingers — a light tap is not enough. Experimental.",
-                    isOn: Bindable(model).threeFingerClickEnabled
-                )
+                Picker(selection: Bindable(model).threeFingerPasteMode) {
+                    Text("Off").tag(ThreeFingerPasteMode.off)
+                    Text("Physical click").tag(ThreeFingerPasteMode.click)
+                    Text("Double tap").tag(ThreeFingerPasteMode.doubleTap)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Three-finger paste")
+                        Text("Middle-click for the trackpad: pastes the latest selection. Experimental.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
 
             Section("Interface") {

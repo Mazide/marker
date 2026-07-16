@@ -14,8 +14,11 @@
 "Paste" = "Collage";
 "Middle-click pastes the latest selection" = "Le clic du milieu colle la dernière sélection";
 "Works over text fields; clicks anywhere else pass through untouched." = "Fonctionne au-dessus des champs de texte ; les clics ailleurs passent sans modification.";
-"Three-finger click pastes the latest selection" = "Le clic à trois doigts colle la dernière sélection";
-"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "Appuyez sur le trackpad avec trois doigts — un toucher léger ne suffit pas. Expérimental.";
+"Three-finger paste" = "Collage à trois doigts";
+"Middle-click for the trackpad: pastes the latest selection. Experimental." = "Le clic du milieu version trackpad : colle la dernière sélection. Expérimental.";
+"Off" = "Désactivé";
+"Physical click" = "Clic physique";
+"Double tap" = "Double toucher";
 "Interface" = "Interface";
 "Show a popup on capture" = "Afficher une notification à la capture";
 "Start at login" = "Ouvrir à l'ouverture de session";
@@ -69,4 +72,5 @@
 /* Paste toast */
 "· pasted via" = "· collé via";
 "three-finger click" = "clic à trois doigts";
+"three-finger double tap" = "double toucher à trois doigts";
 "middle-click" = "clic du milieu";

@@ -14,8 +14,11 @@
 "Paste" = "粘贴";
 "Middle-click pastes the latest selection" = "中键点按粘贴最新所选内容";
 "Works over text fields; clicks anywhere else pass through untouched." = "仅在文本栏上生效；其他位置的点按原样通过。";
-"Three-finger click pastes the latest selection" = "三指点按粘贴最新所选内容";
-"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "用三指按下触控板——轻点无效。实验性功能。";
+"Three-finger paste" = "三指粘贴";
+"Middle-click for the trackpad: pastes the latest selection. Experimental." = "触控板上的中键:粘贴最新所选内容。实验性功能。";
+"Off" = "关闭";
+"Physical click" = "点按";
+"Double tap" = "轻点两下";
 "Interface" = "界面";
 "Show a popup on capture" = "捕获时显示弹窗";
 "Start at login" = "登录时启动";
@@ -69,4 +72,5 @@
 /* Paste toast */
 "· pasted via" = "· 粘贴方式:";
 "three-finger click" = "三指点按";
+"three-finger double tap" = "三指轻点两下";
 "middle-click" = "中键点击";

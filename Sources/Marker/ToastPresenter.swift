@@ -104,12 +104,21 @@ final class ToastPresenter {
 
 enum PasteToastSource {
     case threeFingerClick
+    case threeFingerDoubleTap
     case middleClick
 }
 
 private struct PasteToastView: View {
     let text: String
     let source: PasteToastSource
+
+    private var sourceLabel: Text {
+        switch source {
+        case .threeFingerClick: Text("three-finger click")
+        case .threeFingerDoubleTap: Text("three-finger double tap")
+        case .middleClick: Text("middle-click")
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -122,10 +131,10 @@ private struct PasteToastView: View {
                 Text("· pasted via")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Image(systemName: source == .threeFingerClick ? "hand.tap" : "computermouse")
+                Image(systemName: source == .middleClick ? "computermouse" : "hand.tap")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text(source == .threeFingerClick ? "three-finger click" : "middle-click")
+                sourceLabel
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

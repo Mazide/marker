@@ -4,6 +4,13 @@ import Observation
 import ServiceManagement
 import Sparkle
 
+/// How the trackpad three-finger paste gesture triggers.
+enum ThreeFingerPasteMode: String, CaseIterable {
+    case off
+    case click
+    case doubleTap
+}
+
 @Observable
 @MainActor
 final class AppModel {
@@ -43,15 +50,26 @@ final class AppModel {
         didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
     }
 
-    /// Trackpad three-finger click (physical press, not a light tap) as a
-    /// middle-click substitute. Finger count comes from the private
-    /// MultitouchSupport API — experimental, off by default. Stored under
-    /// the historical "threeFingerTapEnabled" key from the tap era.
-    var threeFingerClickEnabled: Bool = UserDefaults.standard.object(forKey: "threeFingerTapEnabled") as? Bool ?? false {
+    /// Trackpad three-finger paste as a middle-click substitute, via the
+    /// private MultitouchSupport API — experimental, off by default. Click
+    /// is the deliberate, false-positive-proof trigger; double tap is the
+    /// no-force alternative for tap-to-click hands.
+    var threeFingerPasteMode: ThreeFingerPasteMode = AppModel.storedThreeFingerPasteMode() {
         didSet {
-            UserDefaults.standard.set(threeFingerClickEnabled, forKey: "threeFingerTapEnabled")
-            if threeFingerClickEnabled { trackpadTap.start() }
+            UserDefaults.standard.set(threeFingerPasteMode.rawValue, forKey: "threeFingerPasteMode")
+            if threeFingerPasteMode != .off { trackpadTap.start() }
         }
+    }
+
+    /// Migration: before the mode picker there was a bool toggle (under
+    /// the even older "threeFingerTapEnabled" key) whose only behavior was
+    /// the physical click.
+    private static func storedThreeFingerPasteMode() -> ThreeFingerPasteMode {
+        if let raw = UserDefaults.standard.string(forKey: "threeFingerPasteMode"),
+           let mode = ThreeFingerPasteMode(rawValue: raw) {
+            return mode
+        }
+        return UserDefaults.standard.bool(forKey: "threeFingerTapEnabled") ? .click : .off
     }
 
     /// Selections immediately typed over were made to edit, not to copy;
@@ -164,7 +182,7 @@ final class AppModel {
             self?.trackpadTap.fingersTouching() ?? 0
         }
         threeFingerClickTap.onThreeFingerClick = { [weak self] in
-            guard let self, self.threeFingerClickEnabled, self.axTrusted,
+            guard let self, self.threeFingerPasteMode == .click, self.axTrusted,
                   self.shouldPasteAtCursor(input: "three-finger click"),
                   let item = self.history.items.first
             else { return false }
@@ -172,7 +190,15 @@ final class AppModel {
             ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerClick)
             return true
         }
-        if threeFingerClickEnabled {
+        trackpadTap.onThreeFingerDoubleTap = { [weak self] in
+            guard let self, self.threeFingerPasteMode == .doubleTap, self.axTrusted,
+                  self.shouldPasteAtCursor(input: "three-finger double tap"),
+                  let item = self.history.items.first
+            else { return }
+            self.pasteEngine.pasteIntoActiveApp(item.content)
+            ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerDoubleTap)
+        }
+        if threeFingerPasteMode != .off {
             trackpadTap.start()
         }
         hotkey.register()

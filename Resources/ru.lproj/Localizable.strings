@@ -14,8 +14,11 @@
 "Paste" = "Вставка";
 "Middle-click pastes the latest selection" = "Средняя кнопка мыши вставляет последнее выделение";
 "Works over text fields; clicks anywhere else pass through untouched." = "Работает над текстовыми полями; клики в других местах проходят как обычно.";
-"Three-finger click pastes the latest selection" = "Клик тремя пальцами вставляет последнее выделение";
-"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "Нажмите на трекпад тремя пальцами — лёгкого касания недостаточно. Экспериментально.";
+"Three-finger paste" = "Вставка тремя пальцами";
+"Middle-click for the trackpad: pastes the latest selection. Experimental." = "Аналог средней кнопки для трекпада: вставляет последнее выделение. Экспериментально.";
+"Off" = "Выключено";
+"Physical click" = "Физический клик";
+"Double tap" = "Двойной тап";
 "Interface" = "Интерфейс";
 "Show a popup on capture" = "Показывать уведомление при захвате";
 "Start at login" = "Запускать при входе в систему";
@@ -69,4 +72,5 @@
 /* Paste toast */
 "· pasted via" = "· вставлено через";
 "three-finger click" = "клик тремя пальцами";
+"three-finger double tap" = "двойной тап тремя пальцами";
 "middle-click" = "среднюю кнопку";

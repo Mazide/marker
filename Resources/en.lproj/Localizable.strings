@@ -14,8 +14,11 @@
 "Paste" = "Paste";
 "Middle-click pastes the latest selection" = "Middle-click pastes the latest selection";
 "Works over text fields; clicks anywhere else pass through untouched." = "Works over text fields; clicks anywhere else pass through untouched.";
-"Three-finger click pastes the latest selection" = "Three-finger click pastes the latest selection";
-"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "Press the trackpad with three fingers — a light tap is not enough. Experimental.";
+"Three-finger paste" = "Three-finger paste";
+"Middle-click for the trackpad: pastes the latest selection. Experimental." = "Middle-click for the trackpad: pastes the latest selection. Experimental.";
+"Off" = "Off";
+"Physical click" = "Physical click";
+"Double tap" = "Double tap";
 "Interface" = "Interface";
 "Show a popup on capture" = "Show a popup on capture";
 "Start at login" = "Start at login";
@@ -69,4 +72,5 @@
 /* Paste toast */
 "· pasted via" = "· pasted via";
 "three-finger click" = "three-finger click";
+"three-finger double tap" = "three-finger double tap";
 "middle-click" = "middle-click";
