@@ -69,7 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             markerLog.error("another Marker is running (pid \(other.processIdentifier)) — deferring startup")
             // Grace period: an outgoing instance (quit, update) may still be
             // shutting down; only yield to it if it is alive in 2s.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
                 if let survivor = Self.otherRunningInstance() {
                     markerLog.error("pid \(survivor.processIdentifier) is still running — quitting this instance")
                     NSApp.terminate(nil)
@@ -82,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startUp()
     }
 
+    @MainActor
     private func startUp() {
         SelfInstaller.offerMoveToApplicationsIfNeeded()
         AppModel.shared.start()
