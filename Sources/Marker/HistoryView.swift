@@ -213,10 +213,12 @@ struct HistoryView: View {
                     .frame(width: 28, height: 24)
                     .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Settings, updates, quit")
+            .accessibilityLabel("Settings and app actions")
         }
         .padding(.leading, 12)
         .padding(.trailing, 6)
