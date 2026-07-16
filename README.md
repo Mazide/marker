@@ -25,6 +25,7 @@ go to the separate history only.
 - Secrets (API keys, tokens, private keys) reach your clipboard but are
   never written to history.
 - Delete single entries from the popover; clear everything from Settings.
+- Gear menu in the popover: Settings, Check for Updates, Quit.
 - Auto-updates via Sparkle.
 
 ## Build & run
