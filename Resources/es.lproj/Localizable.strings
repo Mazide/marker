@@ -14,8 +14,8 @@
 "Paste" = "Pegado";
 "Middle-click pastes the latest selection" = "El clic central pega la última selección";
 "Works over text fields; clicks anywhere else pass through untouched." = "Funciona sobre campos de texto; los clics en otros lugares pasan sin cambios.";
-"Three-finger tap pastes the latest selection" = "El toque con tres dedos pega la última selección";
-"The trackpad equivalent of middle-click. Experimental." = "El equivalente del clic central en el trackpad. Experimental.";
+"Three-finger click pastes the latest selection" = "El clic con tres dedos pega la última selección";
+"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "Presiona el trackpad con tres dedos; un toque ligero no basta. Experimental.";
 "Interface" = "Interfaz";
 "Show a popup on capture" = "Mostrar un aviso al capturar";
 "Start at login" = "Abrir al iniciar sesión";
@@ -65,3 +65,8 @@
 "7 days" = "7 días";
 "30 days" = "30 días";
 "90 days" = "90 días";
+
+/* Paste toast */
+"· pasted via" = "· pegado con";
+"three-finger click" = "clic con tres dedos";
+"middle-click" = "clic central";

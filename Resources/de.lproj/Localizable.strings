@@ -14,8 +14,8 @@
 "Paste" = "Einsetzen";
 "Middle-click pastes the latest selection" = "Mittelklick setzt die letzte Auswahl ein";
 "Works over text fields; clicks anywhere else pass through untouched." = "Funktioniert über Textfeldern; Klicks anderswo werden unverändert durchgereicht.";
-"Three-finger tap pastes the latest selection" = "Drei-Finger-Tipp setzt die letzte Auswahl ein";
-"The trackpad equivalent of middle-click. Experimental." = "Das Trackpad-Pendant zum Mittelklick. Experimentell.";
+"Three-finger click pastes the latest selection" = "Drei-Finger-Klick setzt die letzte Auswahl ein";
+"Press the trackpad with three fingers — a light tap is not enough. Experimental." = "Trackpad mit drei Fingern herunterdrücken — leichtes Tippen genügt nicht. Experimentell.";
 "Interface" = "Oberfläche";
 "Show a popup on capture" = "Hinweis beim Erfassen anzeigen";
 "Start at login" = "Bei der Anmeldung starten";
@@ -65,3 +65,8 @@
 "7 days" = "7 Tage";
 "30 days" = "30 Tage";
 "90 days" = "90 Tage";
+
+/* Paste toast */
+"· pasted via" = "· eingefügt per";
+"three-finger click" = "Drei-Finger-Klick";
+"middle-click" = "Mittelklick";

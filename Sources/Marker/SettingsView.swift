@@ -66,9 +66,9 @@ private struct GeneralSettingsView: View {
                     isOn: Bindable(model).middleClickPasteEnabled
                 )
                 SettingToggle(
-                    "Three-finger tap pastes the latest selection",
-                    caption: "The trackpad equivalent of middle-click. Experimental.",
-                    isOn: Bindable(model).threeFingerTapEnabled
+                    "Three-finger click pastes the latest selection",
+                    caption: "Press the trackpad with three fingers — a light tap is not enough. Experimental.",
+                    isOn: Bindable(model).threeFingerClickEnabled
                 )
             }
 

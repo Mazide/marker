@@ -43,12 +43,14 @@ final class AppModel {
         didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
     }
 
-    /// Trackpad three-finger tap as a middle-click substitute (private
-    /// MultitouchSupport API — experimental, off by default).
-    var threeFingerTapEnabled: Bool = UserDefaults.standard.object(forKey: "threeFingerTapEnabled") as? Bool ?? false {
+    /// Trackpad three-finger click (physical press, not a light tap) as a
+    /// middle-click substitute. Finger count comes from the private
+    /// MultitouchSupport API — experimental, off by default. Stored under
+    /// the historical "threeFingerTapEnabled" key from the tap era.
+    var threeFingerClickEnabled: Bool = UserDefaults.standard.object(forKey: "threeFingerTapEnabled") as? Bool ?? false {
         didSet {
-            UserDefaults.standard.set(threeFingerTapEnabled, forKey: "threeFingerTapEnabled")
-            if threeFingerTapEnabled { trackpadTap.start() }
+            UserDefaults.standard.set(threeFingerClickEnabled, forKey: "threeFingerTapEnabled")
+            if threeFingerClickEnabled { trackpadTap.start() }
         }
     }
 
@@ -93,6 +95,7 @@ final class AppModel {
     @ObservationIgnored private let mouseMonitor = MouseMonitor()
     @ObservationIgnored private let middleClickTap = MiddleClickTap()
     @ObservationIgnored private let trackpadTap = TrackpadTapMonitor()
+    @ObservationIgnored private let threeFingerClickTap = ThreeFingerClickTap()
     @ObservationIgnored private let hotkey = HotkeyManager()
     @ObservationIgnored private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -154,16 +157,22 @@ final class AppModel {
             _ = point
             // Paste into the current focus, same as ⌥V.
             self.pasteEngine.pasteIntoActiveApp(item.content)
+            ToastPresenter.shared.showPaste(text: item.text, source: .middleClick)
             return true
         }
-        trackpadTap.onThreeFingerTap = { [weak self] in
-            guard let self, self.threeFingerTapEnabled, self.axTrusted,
-                  self.shouldPasteAtCursor(input: "tap"),
-                  let item = self.history.items.first
-            else { return }
-            self.pasteEngine.pasteIntoActiveApp(item.content)
+        threeFingerClickTap.fingersTouching = { [weak self] in
+            self?.trackpadTap.fingersTouching() ?? 0
         }
-        if threeFingerTapEnabled {
+        threeFingerClickTap.onThreeFingerClick = { [weak self] in
+            guard let self, self.threeFingerClickEnabled, self.axTrusted,
+                  self.shouldPasteAtCursor(input: "three-finger click"),
+                  let item = self.history.items.first
+            else { return false }
+            self.pasteEngine.pasteIntoActiveApp(item.content)
+            ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerClick)
+            return true
+        }
+        if threeFingerClickEnabled {
             trackpadTap.start()
         }
         hotkey.register()
@@ -192,6 +201,7 @@ final class AppModel {
             axMonitor.start()
             mouseMonitor.start()
             middleClickTap.start()
+            threeFingerClickTap.start()
         } else {
             pollForTrust()
         }
@@ -247,7 +257,7 @@ final class AppModel {
         }
     }
 
-    /// Shared gate for middle-click and three-finger tap; both paste into
+    /// Shared gate for middle-click and three-finger click; both paste into
     /// the focused element, so both use the same cursor/focus policy.
     private func shouldPasteAtCursor(input: String) -> Bool {
         let cursorRole = axMonitor.roleAtMouseLocation()
@@ -279,6 +289,7 @@ final class AppModel {
                 self.axMonitor.start()
                 self.mouseMonitor.start()
                 self.middleClickTap.start()
+                self.threeFingerClickTap.start()
             }
         }
     }

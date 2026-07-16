@@ -10,13 +10,23 @@ final class ToastPresenter {
     private var hideTimer: Timer?
 
     func show(text: String, appName: String, bundleID: String) {
-        let snippet = text
+        present(ToastView(text: snippet(of: text), appName: appName, bundleID: bundleID))
+    }
+
+    /// Attribution for gesture pastes (three-finger click, middle-click):
+    /// they fire with no visible chrome, so say the insert was us.
+    func showPaste(text: String, source: PasteToastSource) {
+        present(PasteToastView(text: snippet(of: text), source: source))
+    }
+
+    private func snippet(of text: String) -> String {
+        text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n", with: " ")
+    }
 
-        let hosting = NSHostingView(
-            rootView: ToastView(text: snippet, appName: appName, bundleID: bundleID)
-        )
+    private func present(_ view: some View) {
+        let hosting = NSHostingView(rootView: view)
         var size = hosting.fittingSize
         size.height = min(size.height, 120)
         let panel = self.panel ?? makePanel()
@@ -89,6 +99,47 @@ final class ToastPresenter {
         panel.collectionBehavior = [.canJoinAllSpaces, .transient]
         self.panel = panel
         return panel
+    }
+}
+
+enum PasteToastSource {
+    case threeFingerClick
+    case middleClick
+}
+
+private struct PasteToastView: View {
+    let text: String
+    let source: PasteToastSource
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 14, height: 14)
+                Text("Marker")
+                    .font(.caption2.weight(.semibold))
+                Text("· pasted via")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Image(systemName: source == .threeFingerClick ? "hand.tap" : "computermouse")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(source == .threeFingerClick ? "three-finger click" : "middle-click")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Text(text)
+                .font(.system(size: 12.5))
+                .lineLimit(3)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(width: 330, alignment: .leading)
+        .toastBackground()
+        .padding(5)
     }
 }
 
