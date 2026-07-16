@@ -315,7 +315,90 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(keys.copyCount, 0)
     }
 
+    // MARK: - Paste echo suppression
+
+    func testNotificationRightAfterOwnPasteIsSkipped() {
+        engine.externalPasteOccurred()
+        reader.selection = "pasted text plus field contents"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 0, "the field reacting to our paste is not a selection")
+    }
+
+    func testNotificationWellAfterPasteIsCaptured() {
+        engine.externalPasteOccurred()
+        clock = clock.addingTimeInterval(3)
+        reader.selection = "a real selection"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 1)
+    }
+
+    // MARK: - Recapture after the dedupe window
+
+    func testReselectingSameTextRecapturesAfterWindow() {
+        engine.mouseDown()
+        reader.selection = "same text"
+        engine.selectionGesture()
+        scheduler.runAll()
+        XCTAssertEqual(captures.count, 1)
+
+        // The user copied something else meanwhile; re-selecting the same
+        // text must land it on the clipboard again.
+        clock = clock.addingTimeInterval(3)
+        reader.selection = nil
+        engine.mouseDown()
+        reader.selection = "same text"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 2, "re-selection past the window must recapture")
+    }
+
+    func testSameTextWithinWindowStaysDeduped() {
+        engine.mouseDown()
+        reader.selection = "same text"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        clock = clock.addingTimeInterval(0.5)
+        reader.selection = nil
+        engine.mouseDown()
+        reader.selection = "same text"
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 1, "double-fire within the window stays deduped")
+    }
+
     // MARK: - Gesture: browsers capture via synthesized copy
+
+    func testProvenBrowserStillFallsBackWhenAXGoesBlind() {
+        frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
+        // A backstop capture (copy suppressed) must not poison the app
+        // as AX-proven.
+        engine.mouseDown()
+        reader.selection = "first page"
+        engine.selectionGesture()
+        scheduler.runAll()
+        XCTAssertEqual(captures.count, 1)
+
+        // Next page is AX-blind but its Cmd+C works.
+        clock = clock.addingTimeInterval(3)
+        reader.selection = nil
+        keys.onCopy = { [unowned self] in
+            self.pasteboard.externalWrite("pdf text")
+        }
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertEqual(captures.count, 2, "AX-blind browser page must still capture via copy")
+        XCTAssertEqual(captures[1].text, "pdf text")
+    }
+
 
     func testBrowserGestureCapturesViaCopyNotAX() {
         frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
@@ -355,22 +438,20 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(pasteboard.current, "user's clipboard")
     }
 
-    func testBrowserGestureWithoutSelectionDoesNotCopy() {
+    func testBrowserEmptyDragCapturesNothingAndKeepsClipboard() {
+        // Browsers stay fallback-eligible (AX-blind pages depend on it),
+        // so an empty drag may synthesize a no-op ⌘C — it must capture
+        // nothing and leave the clipboard alone.
         frontmost.app = SourceApp(pid: 7, bundleID: "com.google.Chrome", name: "Chrome", isSelf: false)
-        // Prove AX first so the generic fallback is off for this app.
-        engine.mouseDown()
-        reader.selection = "prove ax"
-        engine.selectionGesture()
-        scheduler.runAll()
-        keys.copyCount = 0
+        pasteboard.externalWrite("user's clipboard")
 
         reader.selection = nil
         engine.mouseDown()
         engine.selectionGesture()
         scheduler.runAll()
 
-        XCTAssertEqual(keys.copyCount, 0, "no selection, no synthesized copy")
-        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.count, 0)
+        XCTAssertEqual(pasteboard.current, "user's clipboard")
     }
 
     func testDisabledRichCopyCapturesViaAXOnly() {

@@ -51,10 +51,15 @@ final class PasteEngine {
         }
     }
 
+    /// Fires when a synthesized Cmd+V is posted, so the capture side can
+    /// ignore the AX churn the paste causes in the target field.
+    var onPaste: (() -> Void)?
+
     private func performPaste(_ content: RichText) {
         let saved = pasteboard.snapshot()
         pasteboard.writeContent(content)
         markerLog.info("paste: \(content.plain.count) chars via Cmd+V rich=\(content.hasFlavors)")
+        onPaste?()
         keys.postPaste()
         scheduler.schedule(after: config.restoreDelay) { [pasteboard] in
             pasteboard.restore(saved)

@@ -130,6 +130,9 @@ final class AppModel {
         }
         engine.retractionEnabled = retractEditedEnabled
         engine.richViaCopyEnabled = richCopyEnabled
+        pasteEngine.onPaste = { [weak self] in
+            self?.engine.externalPasteOccurred()
+        }
         mouseMonitor.onMouseDown = { [weak self] shiftClick in
             self?.engine.mouseDown(shiftClick: shiftClick)
         }

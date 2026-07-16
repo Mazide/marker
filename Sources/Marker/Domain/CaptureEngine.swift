@@ -28,6 +28,16 @@ final class CaptureEngine {
         /// arrive via the gesture path, real keyboard selections carry a
         /// selection-intent keystroke after the click.
         var clickQuiet: TimeInterval = 1.5
+        /// Capturing the same text again within this window is event
+        /// double-fire (gesture + notification); after it, it's the user
+        /// re-selecting on purpose — recapture so the clipboard is
+        /// rewritten even though history and toast stay put.
+        var recaptureWindow: TimeInterval = 2.0
+        /// AX notifications within this window after one of our own
+        /// pastes are the target field reacting to the insert (some
+        /// fields select or re-report their content) — capturing that
+        /// echo poisons the history with pasted-into text.
+        var pasteQuiet: TimeInterval = 2.0
     }
 
     /// Browsers: their AX attributed reads are near-empty (Chromium
@@ -69,6 +79,8 @@ final class CaptureEngine {
     private var lastKeyDown = Date.distantPast
     private var lastKeyWasSelectionIntent = false
     private var lastReported: String?
+    private var lastReportedAt = Date.distantPast
+    private var lastExternalPaste = Date.distantPast
     /// Apps that have proven they report selections via AX; for these an
     /// empty AX read means "nothing selected", so never fall back to Cmd+C.
     private var axProvenApps: Set<String> = []
@@ -131,6 +143,13 @@ final class CaptureEngine {
         }
     }
 
+    /// One of our own pastes just went out; the target field's AX churn
+    /// (selecting the inserted text, re-reporting content) must not be
+    /// captured as a new selection.
+    func externalPasteOccurred() {
+        lastExternalPaste = now()
+    }
+
     /// AX selection-changed notification; fires on every caret move while
     /// dragging, so debounce until the user settles.
     func axSelectionChanged() {
@@ -183,6 +202,10 @@ final class CaptureEngine {
             markerLog.debug("skip: notification right after a gesture capture")
             return
         }
+        if now().timeIntervalSince(lastExternalPaste) < config.pasteQuiet {
+            markerLog.info("skip: notification right after our own paste")
+            return
+        }
         // A plain click just before this notification: the selection is the
         // app's own doing (bookmark click, focus change re-selecting a
         // field). A selection-intent keystroke after the click (shift+arrow
@@ -232,7 +255,11 @@ final class CaptureEngine {
                 markerLog.info("gesture: AX text unchanged since mouse-down, trying fallback")
             }
         }
-        guard !axProvenApps.contains(app.bundleID) else { return }
+        // Copy-preferred apps stay fallback-eligible even once proven:
+        // a browser can prove AX on one page and go AX-blind on the next
+        // (PDF viewer, canvas apps) — without this, captures there are
+        // dead until relaunch.
+        guard !axProvenApps.contains(app.bundleID) || capturesViaCopy(app) else { return }
 
         // The app copy-on-selected by itself (terminals, TUIs): the
         // selection is already on the clipboard. Take it, then put the
@@ -259,12 +286,12 @@ final class CaptureEngine {
 
     /// Whether rich content for this app comes from a synthesized copy
     /// rather than the AX attributed read.
-    private func capturesViaCopy(_ app: SourceApp) -> Bool {
+    private func capturesViaCopy(_ app: SourceApp, role: String? = nil) -> Bool {
         guard richViaCopyEnabled else { return false }
         if Self.richViaCopyApps.contains(app.bundleID) { return true }
         // Web content hosted outside a browser (Electron, WKWebView apps)
         // has the same near-empty AX attributes and the same safe Cmd+C.
-        return selection.focusedElementRole() == "AXWebArea"
+        return (role ?? selection.focusedElementRole()) == "AXWebArea"
     }
 
     /// Synthesize Cmd+C, poll for the clipboard to change, grab the text,
@@ -313,29 +340,40 @@ final class CaptureEngine {
         return true
     }
 
-    /// Returns false when the text was empty or a duplicate of the last
-    /// capture — the caller may then try other capture paths. `flavors`
-    /// carries rich pasteboard content from the fallback paths; AX captures
-    /// fetch their rich version here, after the guards, so a rejected
-    /// capture never pays for the attributed AX read.
+    /// Returns false when the text was empty or a fresh duplicate of the
+    /// last capture — the caller may then try other capture paths. The
+    /// duplicate check is time-bounded: past recaptureWindow, the same
+    /// text is the user re-selecting it to copy it again (their clipboard
+    /// may hold something else by now), not an event double-fire.
+    /// `flavors` carries rich pasteboard content from the fallback paths;
+    /// AX captures fetch their rich version here, after the guards, so a
+    /// rejected capture never pays for the attributed AX read.
     @discardableResult
     private func capture(_ rawText: String, app: SourceApp, viaAX: Bool, flavors: RichText? = nil) -> Bool {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text != lastReported else { return false }
+        guard !text.isEmpty else { return false }
+        if text == lastReported,
+           now().timeIntervalSince(lastReportedAt) < config.recaptureWindow {
+            return false
+        }
         lastReported = text
+        lastReportedAt = now()
         recentCaptures.removeAll { $0 == text }
         recentCaptures.append(text)
         if recentCaptures.count > recentCapturesLimit {
             recentCaptures.removeFirst()
         }
 
-        let editable = MiddlePastePolicy.shouldPaste(role: selection.focusedElementRole())
+        let role = selection.focusedElementRole()
+        let editable = MiddlePastePolicy.shouldPaste(role: role)
 
         // An AX capture proves the app only when it came from the app's
         // content, not an editable field. Hybrid apps (Telegram) expose
         // their input box to AX but hide the message list — a capture from
         // the input box must not disable the Cmd+C fallback for the list.
-        if viaAX, !editable, !app.bundleID.isEmpty {
+        // Copy-preferred apps never prove: their captures should keep
+        // flowing through the synthesized copy.
+        if viaAX, !editable, !app.bundleID.isEmpty, !capturesViaCopy(app, role: role) {
             axProvenApps.insert(app.bundleID)
         }
 
