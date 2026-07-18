@@ -37,15 +37,15 @@ final class AppModel {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
     }
 
-    /// X11-style middle-click paste at the click point. Off by default;
+    /// X11-style middle-click paste at the click point. On by default;
     /// only swallows clicks over editable text (MiddlePastePolicy).
-    var middleClickPasteEnabled: Bool = UserDefaults.standard.object(forKey: "middleClickPasteEnabled") as? Bool ?? false {
+    var middleClickPasteEnabled: Bool = UserDefaults.standard.object(forKey: "middleClickPasteEnabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
     }
 
     /// Trackpad three-finger tap as a middle-click substitute (private
-    /// MultitouchSupport API — experimental, off by default).
-    var threeFingerTapEnabled: Bool = UserDefaults.standard.object(forKey: "threeFingerTapEnabled") as? Bool ?? false {
+    /// MultitouchSupport API — experimental, on by default).
+    var threeFingerTapEnabled: Bool = UserDefaults.standard.object(forKey: "threeFingerTapEnabled") as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(threeFingerTapEnabled, forKey: "threeFingerTapEnabled")
             if threeFingerTapEnabled { trackpadTap.start() }
