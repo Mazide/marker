@@ -23,8 +23,20 @@ copy any entry to the clipboard explicitly from the popover.
   auto-expiry (7/30/90 days) in Settings → History.
 - **⌥V** pastes the most recent selection into the active app. The system
   clipboard is briefly swapped and then restored.
+- **⇧⌥V** opens the history popover from anywhere.
 - Menu bar popover: click any history entry to copy it to the clipboard.
 - Secrets (API keys, tokens, private keys) are never written to history.
+- Ignored apps (Settings → Ignored apps): selections in the listed apps
+  are never captured — no history entry, and the ⌘C fallback never fires
+  there. Put your password manager here.
+- `marker-cli`: history from the terminal — `latest`, `history`,
+  `search`, `copy [N]`, and `echo x | marker-cli add`, with `--json`
+  for scripting. Ships inside the app bundle:
+
+  ```sh
+  sudo ln -s /Applications/Marker.app/Contents/MacOS/marker-cli /usr/local/bin/marker
+  marker latest | pbcopy
+  ```
 - Delete single entries from the popover; clear everything from Settings.
 - Gear menu in the popover: Settings, Check for Updates, Quit.
 - Auto-updates via Sparkle.
