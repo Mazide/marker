@@ -10,7 +10,11 @@ import Foundation
 final class CaptureEngine {
     struct Config {
         var debounce: TimeInterval = 0.4
-        var keyIntentWindow: TimeInterval = 0.8
+        /// How long a shift+click legitimizes a selection-changed
+        /// notification. Long enough to cover the debounce plus a slow
+        /// app's re-report, short enough that a tab switch seconds later
+        /// cannot ride on stale intent.
+        var intentWindow: TimeInterval = 1.5
         var settleDelay: TimeInterval = 0.15
         var pollInterval: TimeInterval = 0.05
         var pollAttempts: Int = 16
@@ -22,12 +26,6 @@ final class CaptureEngine {
         /// this long: a focused text field re-reporting its old selection
         /// during a drag elsewhere (Telegram) must not clobber the capture.
         var notificationQuiet: TimeInterval = 1.0
-        /// AX notifications within this window after a plain click are the
-        /// app selecting text by itself (clicking a bookmark puts the page
-        /// URL selected into the address bar) — real mouse selections
-        /// arrive via the gesture path, real keyboard selections carry a
-        /// selection-intent keystroke after the click.
-        var clickQuiet: TimeInterval = 1.5
         /// Capturing the same text again within this window is event
         /// double-fire (gesture + notification); after it, it's the user
         /// re-selecting on purpose — recapture so the clipboard is
@@ -80,8 +78,6 @@ final class CaptureEngine {
     private let now: () -> Date
 
     private var debounceToken: SchedulerToken?
-    private var lastKeyDown = Date.distantPast
-    private var lastKeyWasSelectionIntent = false
     private var lastReported: String?
     private var lastReportedAt = Date.distantPast
     private var lastExternalPaste = Date.distantPast
@@ -131,8 +127,6 @@ final class CaptureEngine {
     // MARK: - Inputs from the system layer
 
     func keyDown(isSelectionIntent: Bool, isPlainTyping: Bool) {
-        lastKeyDown = now()
-        lastKeyWasSelectionIntent = isSelectionIntent
 
         // Typing while an editable-field capture is pending: the selection
         // was made to replace/delete, not to copy — drop it silently.
@@ -209,11 +203,6 @@ final class CaptureEngine {
     // MARK: - Decision flow
 
     private func captureFromAXNotification() {
-        if now().timeIntervalSince(lastKeyDown) < config.keyIntentWindow,
-           !lastKeyWasSelectionIntent {
-            markerLog.debug("skip: selection right after non-selection keystroke")
-            return
-        }
         if now().timeIntervalSince(lastGestureCapture) < config.notificationQuiet {
             markerLog.debug("skip: notification right after a gesture capture")
             return
@@ -222,15 +211,18 @@ final class CaptureEngine {
             markerLog.info("skip: notification right after our own paste")
             return
         }
-        // A plain click just before this notification: the selection is the
-        // app's own doing (bookmark click, focus change re-selecting a
-        // field). A selection-intent keystroke after the click (shift+arrow
-        // following a caret click) or a shift+click still counts as the
-        // user selecting.
-        if now().timeIntervalSince(lastMouseDown) < config.clickQuiet,
-           !lastMouseDownWasShift,
-           !(lastKeyDown >= lastMouseDown && lastKeyWasSelectionIntent) {
-            markerLog.debug("skip: notification right after a plain click")
+        // Capture is mouse-only: drags and multi-clicks arrive via the
+        // gesture path, and the sole selection that exists purely as a
+        // notification is a shift+click extension. Keyboard selections
+        // (shift+arrows, ⌘A) are deliberately not captured — that is what
+        // ⌘C is for. Everything else the notification path delivers — a
+        // tab or app switch revealing an old selection, an address bar
+        // selecting itself on focus, a page selecting content on load —
+        // is the app's doing, not the user's.
+        let shiftClickIntent = lastMouseDownWasShift
+            && now().timeIntervalSince(lastMouseDown) < config.intentWindow
+        guard shiftClickIntent else {
+            markerLog.debug("skip: notification without a shift+click behind it")
             return
         }
         guard let app = frontmost.frontmostApp(), !app.isSelf,
