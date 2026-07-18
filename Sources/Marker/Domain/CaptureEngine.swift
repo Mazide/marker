@@ -66,6 +66,10 @@ final class CaptureEngine {
     /// Rich capture through a synthesized ⌘C in browsers and web views
     /// (their AX attributed reads are near-empty). Off: AX-only capture.
     var richViaCopyEnabled = true
+    /// Selections in these apps are never captured. Checked at the entry
+    /// gates so the ⌘C fallback can't fire either — synthesizing Copy in
+    /// a password manager would put the secret on the clipboard.
+    var excludedBundleIDs: Set<String> = []
 
     private let selection: SelectionReading
     private let pasteboard: PasteboardControlling
@@ -182,7 +186,9 @@ final class CaptureEngine {
 
     /// Mouse-up after a drag or a multi-click.
     func selectionGesture() {
-        guard let app = frontmost.frontmostApp(), !app.isSelf else { return }
+        guard let app = frontmost.frontmostApp(), !app.isSelf,
+              !excludedBundleIDs.contains(app.bundleID)
+        else { return }
         let downCount = downChangeCount
         // Give the app a beat to finalize the selection after mouse-up.
         scheduler.schedule(after: config.settleDelay) { [weak self] in
@@ -218,6 +224,7 @@ final class CaptureEngine {
             return
         }
         guard let app = frontmost.frontmostApp(), !app.isSelf,
+              !excludedBundleIDs.contains(app.bundleID),
               let text = selection.currentSelection()
         else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

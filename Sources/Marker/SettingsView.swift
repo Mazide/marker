@@ -54,6 +54,33 @@ private struct GeneralSettingsView: View {
                 )
             }
 
+            Section {
+                ForEach(model.excludedBundleIDs, id: \.self) { bundleID in
+                    HStack(spacing: 8) {
+                        Image(nsImage: AppIcons.icon(for: bundleID))
+                            .resizable()
+                            .frame(width: 16, height: 16)
+                        Text(Self.appDisplayName(for: bundleID))
+                        Spacer()
+                        Button {
+                            model.excludedBundleIDs.removeAll { $0 == bundleID }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Stop ignoring")
+                    }
+                }
+                addIgnoredAppMenu
+            } header: {
+                Text("Ignored apps")
+            } footer: {
+                Text("Selections in these apps are never captured — no history entry, no ⌘C fallback.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Paste") {
                 SettingToggle(
                     "Middle-click pastes the latest selection",
@@ -96,6 +123,49 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Running regular apps first — the app someone wants to ignore is
+    /// usually open right now — with an open panel for everything else.
+    private var addIgnoredAppMenu: some View {
+        Menu("Add App…") {
+            let running = NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular }
+                .compactMap(\.bundleIdentifier)
+                .filter { $0 != Bundle.main.bundleIdentifier && !model.excludedBundleIDs.contains($0) }
+                .sorted { Self.appDisplayName(for: $0) < Self.appDisplayName(for: $1) }
+            ForEach(running, id: \.self) { bundleID in
+                Button {
+                    model.excludedBundleIDs.append(bundleID)
+                } label: {
+                    Image(nsImage: AppIcons.icon(for: bundleID))
+                    Text(Self.appDisplayName(for: bundleID))
+                }
+            }
+            Divider()
+            Button("Other…") { pickIgnoredApp() }
+        }
+        .fixedSize()
+    }
+
+    private func pickIgnoredApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(filePath: "/Applications")
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url,
+              let bundleID = Bundle(url: url)?.bundleIdentifier,
+              !model.excludedBundleIDs.contains(bundleID)
+        else { return }
+        model.excludedBundleIDs.append(bundleID)
+    }
+
+    private static func appDisplayName(for bundleID: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            return bundleID
+        }
+        return FileManager.default.displayName(atPath: url.path)
+            .replacingOccurrences(of: ".app", with: "")
     }
 
     private var footer: some View {

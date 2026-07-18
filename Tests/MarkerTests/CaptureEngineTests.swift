@@ -689,6 +689,26 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertTrue(captures.isEmpty)
     }
 
+    func testGestureInExcludedAppIsIgnoredWithoutFallbackCopy() {
+        engine.excludedBundleIDs = ["com.example.app"]
+        reader.selection = "master password"
+        engine.mouseDown()
+        engine.selectionGesture()
+        scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty)
+        XCTAssertEqual(keys.copyCount, 0, "excluded app must never receive a synthesized Cmd+C")
+    }
+
+    func testAXNotificationInExcludedAppIsIgnored() {
+        engine.excludedBundleIDs = ["com.example.app"]
+        reader.selection = "master password"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty)
+    }
+
     // MARK: - Select-to-edit suppression (delayed commit)
 
     private func gestureCapture(_ text: String, focusedRole: String) {
