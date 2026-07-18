@@ -6,6 +6,7 @@ struct HistoryView: View {
     @Environment(\.openSettings) private var openSettingsAction
     @State private var searchText = ""
     @State private var filterBundleID: String?
+    @FocusState private var searchFocused: Bool
 
     private func openSettings() {
         dismiss()
@@ -21,6 +22,12 @@ struct HistoryView: View {
             footer
         }
         .frame(width: 360)
+        .onAppear {
+            // Typing right after ⇧⌥V should land in search. The async hop
+            // waits out the popover window becoming key; setting the focus
+            // synchronously here is dropped.
+            DispatchQueue.main.async { searchFocused = true }
+        }
     }
 
     static let accent = Color(red: 0.91, green: 0.46, blue: 0.05)
@@ -45,6 +52,7 @@ struct HistoryView: View {
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.body)
+                .focused($searchFocused)
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
