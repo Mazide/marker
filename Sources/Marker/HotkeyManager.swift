@@ -1,13 +1,21 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// Registers a global Option+V hotkey via the Carbon hotkey API.
-/// Unlike NSEvent global monitors, RegisterEventHotKey consumes the
-/// keystroke, so "√" is not typed into the focused app.
+/// Registers global hotkeys via the Carbon hotkey API. Unlike NSEvent
+/// global monitors, RegisterEventHotKey consumes the keystroke, so "√"
+/// is not typed into the focused app.
 final class HotkeyManager {
-    var onHotkey: (() -> Void)?
+    /// Marker's global hotkeys. Raw value doubles as the Carbon hotkey ID.
+    enum Hotkey: UInt32 {
+        /// ⌥V — paste the latest selection into the active app.
+        case pasteLatest = 1
+        /// ⇧⌥V — open the history popover.
+        case showHistory = 2
+    }
 
-    private var hotKeyRef: EventHotKeyRef?
+    var onHotkey: ((Hotkey) -> Void)?
+
+    private var hotKeyRefs: [EventHotKeyRef?] = []
     private var handlerRef: EventHandlerRef?
 
     func register() {
@@ -18,10 +26,21 @@ final class HotkeyManager {
         let userData = Unmanaged.passUnretained(self).toOpaque()
         let installErr = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, userData in
+            { _, event, userData in
                 guard let userData else { return noErr }
+                var hotKeyID = EventHotKeyID()
+                GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard let hotkey = Hotkey(rawValue: hotKeyID.id) else { return noErr }
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
-                DispatchQueue.main.async { manager.onHotkey?() }
+                DispatchQueue.main.async { manager.onHotkey?(hotkey) }
                 return noErr
             },
             1,
@@ -30,15 +49,23 @@ final class HotkeyManager {
             &handlerRef
         )
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x4D52_4B52), id: 1) // 'MRKR'
-        let registerErr = RegisterEventHotKey(
-            UInt32(kVK_ANSI_V),
-            UInt32(optionKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-        markerLog.info("hotkey register: handler=\(installErr) hotkey=\(registerErr)")
+        let signature = OSType(0x4D52_4B52) // 'MRKR'
+        var errs: [OSStatus] = []
+        for (key, modifiers) in [
+            (Hotkey.pasteLatest, UInt32(optionKey)),
+            (Hotkey.showHistory, UInt32(optionKey | shiftKey)),
+        ] {
+            var ref: EventHotKeyRef?
+            errs.append(RegisterEventHotKey(
+                UInt32(kVK_ANSI_V),
+                modifiers,
+                EventHotKeyID(signature: signature, id: key.rawValue),
+                GetApplicationEventTarget(),
+                0,
+                &ref
+            ))
+            hotKeyRefs.append(ref)
+        }
+        markerLog.info("hotkey register: handler=\(installErr) hotkeys=\(errs)")
     }
 }

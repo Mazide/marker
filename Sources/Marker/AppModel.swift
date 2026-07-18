@@ -38,6 +38,16 @@ final class AppModel {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
     }
 
+    /// Bundle IDs whose selections are never captured (password managers,
+    /// anything private). Enforced inside CaptureEngine, before the ⌘C
+    /// fallback can touch the app's clipboard.
+    var excludedBundleIDs: [String] = UserDefaults.standard.stringArray(forKey: "excludedBundleIDs") ?? [] {
+        didSet {
+            UserDefaults.standard.set(excludedBundleIDs, forKey: "excludedBundleIDs")
+            engine.excludedBundleIDs = Set(excludedBundleIDs)
+        }
+    }
+
     /// X11-style middle-click paste at the click point. Off by default;
     /// only swallows clicks over editable text (MiddlePastePolicy).
     var middleClickPasteEnabled: Bool = UserDefaults.standard.object(forKey: "middleClickPasteEnabled") as? Bool ?? false {
@@ -145,6 +155,7 @@ final class AppModel {
         }
         engine.retractionEnabled = retractEditedEnabled
         engine.richViaCopyEnabled = richCopyEnabled
+        engine.excludedBundleIDs = Set(excludedBundleIDs)
         pasteEngine.onPaste = { [weak self] in
             self?.engine.externalPasteOccurred()
         }
@@ -157,9 +168,15 @@ final class AppModel {
         engine.onCapture = { [weak self] content, app, _ in
             self?.ingest(content: content, app: app)
         }
-        hotkey.onHotkey = { [weak self] in
-            guard let self, let item = self.history.items.first else { return }
-            self.pasteEngine.pasteIntoActiveApp(item.content)
+        hotkey.onHotkey = { [weak self] key in
+            guard let self else { return }
+            switch key {
+            case .pasteLatest:
+                guard let item = self.history.items.first else { return }
+                self.pasteEngine.pasteIntoActiveApp(item.content)
+            case .showHistory:
+                self.openHistoryPopover()
+            }
         }
         middleClickTap.onMiddleClick = { [weak self] point in
             guard let self, self.middleClickPasteEnabled, self.axTrusted,
@@ -249,6 +266,23 @@ final class AppModel {
 
     func copyToClipboard(_ item: SelectionItem) {
         pasteboard.writeContent(item.content)
+    }
+
+    /// SwiftUI's MenuBarExtra has no public API to open its window, so the
+    /// hotkey presses the status item's button the way a click would. The
+    /// KVC key is private ("statusItem" on NSStatusBarWindow) — probed with
+    /// responds(to:) first so an OS change degrades to a log line, not a
+    /// crash.
+    func openHistoryPopover() {
+        guard let window = NSApp.windows.first(where: { $0.className == "NSStatusBarWindow" }),
+              window.responds(to: Selector(("statusItem"))),
+              let item = window.value(forKey: "statusItem") as? NSStatusItem,
+              let button = item.button
+        else {
+            markerLog.error("history hotkey: status item button not reachable")
+            return
+        }
+        button.performClick(nil)
     }
 
     func openAccessibilitySettings() {
