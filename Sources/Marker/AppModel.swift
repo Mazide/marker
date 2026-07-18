@@ -172,7 +172,7 @@ final class AppModel {
             guard let self else { return }
             switch key {
             case .pasteLatest:
-                guard let item = self.history.items.first else { return }
+                guard let item = self.itemToPaste() else { return }
                 self.pasteEngine.pasteIntoActiveApp(item.content)
             case .showHistory:
                 self.openHistoryPopover()
@@ -181,7 +181,7 @@ final class AppModel {
         middleClickTap.onMiddleClick = { [weak self] point in
             guard let self, self.middleClickPasteEnabled, self.axTrusted,
                   self.shouldPasteAtCursor(input: "middle-click"),
-                  let item = self.history.items.first
+                  let item = self.itemToPaste()
             else { return false }
             _ = point
             // Paste into the current focus, same as ⌥V.
@@ -195,7 +195,7 @@ final class AppModel {
         threeFingerClickTap.onThreeFingerClick = { [weak self] in
             guard let self, self.threeFingerPasteMode == .click, self.axTrusted,
                   self.shouldPasteAtCursor(input: "three-finger click"),
-                  let item = self.history.items.first
+                  let item = self.itemToPaste()
             else { return false }
             self.pasteEngine.pasteIntoActiveApp(item.content)
             ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerClick)
@@ -204,7 +204,7 @@ final class AppModel {
         trackpadTap.onThreeFingerDoubleTap = { [weak self] in
             guard let self, self.threeFingerPasteMode == .doubleTap, self.axTrusted,
                   self.shouldPasteAtCursor(input: "three-finger double tap"),
-                  let item = self.history.items.first
+                  let item = self.itemToPaste()
             else { return }
             self.pasteEngine.pasteIntoActiveApp(item.content)
             ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerDoubleTap)
@@ -309,6 +309,15 @@ final class AppModel {
                 warning: saved ? nil : "Couldn't save to history"
             )
         }
+    }
+
+    /// What ⌥V and the click gestures should paste — usually the newest
+    /// entry, but never a selection onto itself (PastePolicy).
+    private func itemToPaste() -> SelectionItem? {
+        PastePolicy.item(
+            history: history.items,
+            currentSelection: axMonitor.currentSelection()
+        )
     }
 
     /// Shared gate for middle-click and three-finger click; both paste into
