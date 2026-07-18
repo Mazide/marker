@@ -5,3 +5,4 @@ assets/AppIcon.iconset/
 *.xcodeproj
 .swiftpm/
 .wrangler/
+.semgrep-report*.json
