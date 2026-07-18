@@ -10,7 +10,11 @@ import Foundation
 final class CaptureEngine {
     struct Config {
         var debounce: TimeInterval = 0.4
-        var keyIntentWindow: TimeInterval = 0.8
+        /// How long a shift/⌘A keystroke or a shift+click legitimizes a
+        /// selection-changed notification. Long enough to cover the
+        /// debounce plus a slow app's re-report, short enough that a tab
+        /// switch seconds later cannot ride on stale intent.
+        var intentWindow: TimeInterval = 1.5
         var settleDelay: TimeInterval = 0.15
         var pollInterval: TimeInterval = 0.05
         var pollAttempts: Int = 16
@@ -22,12 +26,6 @@ final class CaptureEngine {
         /// this long: a focused text field re-reporting its old selection
         /// during a drag elsewhere (Telegram) must not clobber the capture.
         var notificationQuiet: TimeInterval = 1.0
-        /// AX notifications within this window after a plain click are the
-        /// app selecting text by itself (clicking a bookmark puts the page
-        /// URL selected into the address bar) — real mouse selections
-        /// arrive via the gesture path, real keyboard selections carry a
-        /// selection-intent keystroke after the click.
-        var clickQuiet: TimeInterval = 1.5
         /// Capturing the same text again within this window is event
         /// double-fire (gesture + notification); after it, it's the user
         /// re-selecting on purpose — recapture so the clipboard is
@@ -209,11 +207,6 @@ final class CaptureEngine {
     // MARK: - Decision flow
 
     private func captureFromAXNotification() {
-        if now().timeIntervalSince(lastKeyDown) < config.keyIntentWindow,
-           !lastKeyWasSelectionIntent {
-            markerLog.debug("skip: selection right after non-selection keystroke")
-            return
-        }
         if now().timeIntervalSince(lastGestureCapture) < config.notificationQuiet {
             markerLog.debug("skip: notification right after a gesture capture")
             return
@@ -222,15 +215,20 @@ final class CaptureEngine {
             markerLog.info("skip: notification right after our own paste")
             return
         }
-        // A plain click just before this notification: the selection is the
-        // app's own doing (bookmark click, focus change re-selecting a
-        // field). A selection-intent keystroke after the click (shift+arrow
-        // following a caret click) or a shift+click still counts as the
-        // user selecting.
-        if now().timeIntervalSince(lastMouseDown) < config.clickQuiet,
-           !lastMouseDownWasShift,
-           !(lastKeyDown >= lastMouseDown && lastKeyWasSelectionIntent) {
-            markerLog.debug("skip: notification right after a plain click")
+        // A notification is a capture only when the user just expressed
+        // selection intent: a shift/⌘A keystroke (not voided by a later
+        // plain click, which collapses or re-targets the selection) or a
+        // shift+click extension. Mouse selections arrive via the gesture
+        // path. Everything else — a tab or app switch revealing an old
+        // selection, an address bar selecting itself on focus, a page
+        // selecting content on load — is the app's doing, not the user's.
+        let keyIntent = lastKeyWasSelectionIntent
+            && now().timeIntervalSince(lastKeyDown) < config.intentWindow
+            && lastKeyDown >= lastMouseDown
+        let shiftClickIntent = lastMouseDownWasShift
+            && now().timeIntervalSince(lastMouseDown) < config.intentWindow
+        guard keyIntent || shiftClickIntent else {
+            markerLog.debug("skip: notification without selection intent")
             return
         }
         guard let app = frontmost.frontmostApp(), !app.isSelf,

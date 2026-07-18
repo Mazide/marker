@@ -140,9 +140,11 @@ final class CaptureEngineTests: XCTestCase {
             captures.map(\.text), ["old input text", "message text"],
             "the stale notification must not re-capture the input text")
 
-        // A genuinely new selection after the quiet window still lands.
+        // A genuinely new keyboard selection after the quiet window still
+        // lands.
         clock = clock.addingTimeInterval(2)
         reader.selection = "fresh keyboard selection"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.last?.text, "fresh keyboard selection")
@@ -154,6 +156,7 @@ final class CaptureEngineTests: XCTestCase {
         // counts as a user selection.
         reader.selection = "old input text"
         reader.focusedRole = "AXTextArea"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.map(\.text), ["old input text"])
@@ -166,14 +169,17 @@ final class CaptureEngineTests: XCTestCase {
         scheduler.runAll()
         XCTAssertEqual(captures.map(\.text), ["old input text", "message text"])
 
-        // Same stale text re-reported seconds later.
+        // Same stale text re-reported seconds later — even riding on a
+        // fresh selection-intent keystroke, the ring suppresses it.
         clock = clock.addingTimeInterval(3)
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.count, 2, "re-report must not clobber the capture")
 
         // A genuinely new selection in the input still lands.
         reader.selection = "new input text"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.last?.text, "new input text")
@@ -183,6 +189,7 @@ final class CaptureEngineTests: XCTestCase {
         // single-slot memory).
         clock = clock.addingTimeInterval(3)
         reader.selection = "old input text"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(
@@ -330,6 +337,7 @@ final class CaptureEngineTests: XCTestCase {
         engine.externalPasteOccurred()
         clock = clock.addingTimeInterval(3)
         reader.selection = "a real selection"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
 
@@ -567,14 +575,43 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(captures[0].text, "selected via shift+arrows")
     }
 
-    func testMouseSelectionLongAfterKeystrokeIsCaptured() {
-        reader.selection = "mouse selection"
-        engine.keyDown(isSelectionIntent: false, isPlainTyping: true)
-        clock = clock.addingTimeInterval(5) // intent window passed
+    func testNotificationWithoutIntentIsSkipped() {
+        // Switching to a tab or app where text is already selected fires
+        // a selection-changed notification with no user gesture behind it
+        // — it must not be captured (Jira pages select their canned text,
+        // Chrome selects the address bar on focus).
+        reader.selection = "https://jira.example/browse/TMPL-14044"
+        clock = clock.addingTimeInterval(5) // long after any input
         engine.axSelectionChanged()
         scheduler.runAll()
 
-        XCTAssertEqual(captures.count, 1)
+        XCTAssertTrue(captures.isEmpty, "a selection revealed by a tab switch is not the user's")
+    }
+
+    func testStaleIntentDoesNotLegitimizeLaterNotification() {
+        // Shift+arrows selected something; seconds later a tab switch
+        // reveals another selection. The old intent must not cover it.
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        clock = clock.addingTimeInterval(5)
+        reader.selection = "revealed by tab switch"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty)
+    }
+
+    func testPlainClickVoidsEarlierKeyIntent() {
+        // Shift+arrows, then a plain click elsewhere: the click collapses
+        // or re-targets the selection, so a following notification is the
+        // app's re-report, not the keyboard selection.
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        clock = clock.addingTimeInterval(0.3)
+        engine.mouseDown()
+        reader.selection = "field re-reporting on focus"
+        engine.axSelectionChanged()
+        scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty)
     }
 
     func testBookmarkClickSelectionIsSkipped() {
@@ -640,18 +677,21 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(captures.map(\.text), ["extended selection"])
     }
 
-    func testNotificationLongAfterClickIsCaptured() {
+    func testNotificationLongAfterClickWithoutIntentIsSkipped() {
+        // Click a tab, page loads slowly, its selection reports seconds
+        // later — still nobody selected anything.
         engine.mouseDown()
         clock = clock.addingTimeInterval(3)
         reader.selection = "selection well after the click"
         engine.axSelectionChanged()
         scheduler.runAll()
 
-        XCTAssertEqual(captures.count, 1)
+        XCTAssertTrue(captures.isEmpty)
     }
 
     func testDebounceCoalescesNotificationBursts() {
         reader.selection = "final"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         engine.axSelectionChanged()
         engine.axSelectionChanged()
@@ -703,6 +743,7 @@ final class CaptureEngineTests: XCTestCase {
     func testAXNotificationInExcludedAppIsIgnored() {
         engine.excludedBundleIDs = ["com.example.app"]
         reader.selection = "master password"
+        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
 
