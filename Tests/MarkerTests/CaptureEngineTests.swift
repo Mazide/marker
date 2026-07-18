@@ -140,14 +140,14 @@ final class CaptureEngineTests: XCTestCase {
             captures.map(\.text), ["old input text", "message text"],
             "the stale notification must not re-capture the input text")
 
-        // A genuinely new keyboard selection after the quiet window still
-        // lands.
+        // A genuinely new shift+click extension after the quiet window
+        // still lands.
         clock = clock.addingTimeInterval(2)
-        reader.selection = "fresh keyboard selection"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        reader.selection = "fresh extended selection"
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
-        XCTAssertEqual(captures.last?.text, "fresh keyboard selection")
+        XCTAssertEqual(captures.last?.text, "fresh extended selection")
     }
 
     func testLateReReportedSelectionIsSuppressed() {
@@ -156,7 +156,7 @@ final class CaptureEngineTests: XCTestCase {
         // counts as a user selection.
         reader.selection = "old input text"
         reader.focusedRole = "AXTextArea"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.map(\.text), ["old input text"])
@@ -170,16 +170,16 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(captures.map(\.text), ["old input text", "message text"])
 
         // Same stale text re-reported seconds later — even riding on a
-        // fresh selection-intent keystroke, the ring suppresses it.
+        // fresh shift+click, the ring suppresses it.
         clock = clock.addingTimeInterval(3)
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.count, 2, "re-report must not clobber the capture")
 
         // A genuinely new selection in the input still lands.
         reader.selection = "new input text"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(captures.last?.text, "new input text")
@@ -189,7 +189,7 @@ final class CaptureEngineTests: XCTestCase {
         // single-slot memory).
         clock = clock.addingTimeInterval(3)
         reader.selection = "old input text"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
         XCTAssertEqual(
@@ -337,7 +337,7 @@ final class CaptureEngineTests: XCTestCase {
         engine.externalPasteOccurred()
         clock = clock.addingTimeInterval(3)
         reader.selection = "a real selection"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
 
@@ -565,14 +565,17 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertTrue(captures.isEmpty)
     }
 
-    func testSelectionIntentKeystrokeIsCaptured() {
+    func testKeyboardSelectionIsNotCaptured() {
+        // Capture is mouse-only: shift+arrows (and ⌘A) selections are not
+        // captured — apps re-report selections on focus changes with the
+        // same signature, and shift+letter typing (capitals) would count
+        // as intent. ⌘C covers the keyboard flow.
         reader.selection = "selected via shift+arrows"
         engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
         engine.axSelectionChanged()
         scheduler.runAll()
 
-        XCTAssertEqual(captures.count, 1)
-        XCTAssertEqual(captures[0].text, "selected via shift+arrows")
+        XCTAssertTrue(captures.isEmpty)
     }
 
     func testNotificationWithoutIntentIsSkipped() {
@@ -588,26 +591,12 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertTrue(captures.isEmpty, "a selection revealed by a tab switch is not the user's")
     }
 
-    func testStaleIntentDoesNotLegitimizeLaterNotification() {
-        // Shift+arrows selected something; seconds later a tab switch
+    func testStaleShiftClickDoesNotLegitimizeLaterNotification() {
+        // A shift+click extended something; seconds later a tab switch
         // reveals another selection. The old intent must not cover it.
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         clock = clock.addingTimeInterval(5)
         reader.selection = "revealed by tab switch"
-        engine.axSelectionChanged()
-        scheduler.runAll()
-
-        XCTAssertTrue(captures.isEmpty)
-    }
-
-    func testPlainClickVoidsEarlierKeyIntent() {
-        // Shift+arrows, then a plain click elsewhere: the click collapses
-        // or re-targets the selection, so a following notification is the
-        // app's re-report, not the keyboard selection.
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
-        clock = clock.addingTimeInterval(0.3)
-        engine.mouseDown()
-        reader.selection = "field re-reporting on focus"
         engine.axSelectionChanged()
         scheduler.runAll()
 
@@ -653,9 +642,9 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(captures.map(\.text), ["doc text"])
     }
 
-    func testKeyboardSelectionAfterCaretClickIsCaptured() {
-        // Click to place the caret, then shift+arrows to select: the
-        // selection-intent keystroke after the click legitimizes it.
+    func testKeyboardSelectionAfterCaretClickIsNotCaptured() {
+        // Click to place the caret, then shift+arrows: still keyboard —
+        // still not captured.
         engine.mouseDown()
         clock = clock.addingTimeInterval(0.3)
         engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
@@ -663,7 +652,7 @@ final class CaptureEngineTests: XCTestCase {
         engine.axSelectionChanged()
         scheduler.runAll()
 
-        XCTAssertEqual(captures.map(\.text), ["selected via shift+end"])
+        XCTAssertTrue(captures.isEmpty)
     }
 
     func testShiftClickExtendIsCaptured() {
@@ -691,7 +680,7 @@ final class CaptureEngineTests: XCTestCase {
 
     func testDebounceCoalescesNotificationBursts() {
         reader.selection = "final"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         engine.axSelectionChanged()
         engine.axSelectionChanged()
@@ -743,7 +732,7 @@ final class CaptureEngineTests: XCTestCase {
     func testAXNotificationInExcludedAppIsIgnored() {
         engine.excludedBundleIDs = ["com.example.app"]
         reader.selection = "master password"
-        engine.keyDown(isSelectionIntent: true, isPlainTyping: false)
+        engine.mouseDown(shiftClick: true)
         engine.axSelectionChanged()
         scheduler.runAll()
 
