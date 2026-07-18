@@ -312,12 +312,21 @@ final class AppModel {
     }
 
     /// What ⌥V and the click gestures should paste — usually the newest
-    /// entry, but never a selection onto itself (PastePolicy).
+    /// entry, but never a selection onto itself (PastePolicy). When the
+    /// newest entry is skipped it was a select-to-replace target, not a
+    /// wanted capture — the paste wipes it from the screen, so retract it
+    /// from history too.
     private func itemToPaste() -> SelectionItem? {
-        PastePolicy.item(
-            history: history.items,
+        let items = history.items
+        let picked = PastePolicy.item(
+            history: items,
             currentSelection: axMonitor.currentSelection()
         )
+        if let picked, let first = items.first, picked.id != first.id {
+            history.delete(first)
+            markerLog.info("retracted select-to-replace capture from history")
+        }
+        return picked
     }
 
     /// Shared gate for middle-click and three-finger click; both paste into

@@ -719,6 +719,15 @@ final class CaptureEngineTests: XCTestCase {
         engine.selectionGesture()
     }
 
+    func testPasteOverPendingEditableCaptureDropsIt() {
+        gestureCapture("selected to replace", focusedRole: "AXTextField")
+        scheduler.runNext() // settle -> schedules delayed commit
+        engine.externalPasteOccurred() // ⌥V/middle-click replaced the selection
+        scheduler.runAll()
+
+        XCTAssertTrue(captures.isEmpty, "select-to-replace must not reach history")
+    }
+
     func testEditableCaptureCommitsAfterQuietDelay() {
         gestureCapture("draft sentence", focusedRole: "AXTextArea")
         scheduler.runNext() // settle -> schedules delayed commit

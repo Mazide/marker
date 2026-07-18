@@ -152,6 +152,16 @@ final class CaptureEngine {
     /// captured as a new selection.
     func externalPasteOccurred() {
         lastExternalPaste = now()
+        // Pasting over a pending selection is select-to-replace, the paste
+        // flavor of select-to-edit — the selection was a target, not a
+        // capture. Drop it before it reaches history (and the toast).
+        if let pending = pendingCommit,
+           frontmost.frontmostApp()?.bundleID == pending.app.bundleID {
+            pending.token.cancel()
+            pendingCommit = nil
+            lastReported = nil
+            markerLog.info("dropped select-to-replace capture (paste)")
+        }
     }
 
     /// AX selection-changed notification; fires on every caret move while
