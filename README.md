@@ -3,16 +3,16 @@
 # Marker
 
 Linux-style primary selection for macOS. Select text in any app — it is
-captured into Marker's history and (by default) placed on the system
-clipboard, ready to Cmd+V. Prefer your clipboard untouched? Turn off
-"To clipboard" and Marker runs in strict X11-primary mode: selections
-go to the separate history only.
+captured into Marker's history, a separate buffer that leaves your
+clipboard untouched, and pasted with Opt+V or a middle-click. Prefer
+classic copy-on-select? Turn on "To clipboard" and every selection also
+lands on the system clipboard, ready to Cmd+V.
 
 ## Features
 
 - Watches text selections system-wide via the Accessibility API.
-- Auto-copy to the system clipboard — on by default, toggleable for
-  strict separate-buffer mode.
+- Strict separate-buffer mode by default; optional auto-copy to the
+  system clipboard for classic copy-on-select.
 - Fallback capture for apps that hide selections from Accessibility
   (Telegram, kitty, …): synthesized Cmd+C or detection of the app's own
   copy-on-select, with the previous clipboard restored afterwards.

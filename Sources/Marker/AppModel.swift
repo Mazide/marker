@@ -28,8 +28,9 @@ final class AppModel {
     }
 
     /// Classic auto-copy: captured selections also land on the system
-    /// clipboard. Off = strict X11-primary mode (history only).
-    var copyToClipboardEnabled: Bool = UserDefaults.standard.object(forKey: "copyToClipboardEnabled") as? Bool ?? true {
+    /// clipboard. Off (the default) = strict X11-primary mode: history
+    /// only, clipboard untouched.
+    var copyToClipboardEnabled: Bool = UserDefaults.standard.object(forKey: "copyToClipboardEnabled") as? Bool ?? false {
         didSet { UserDefaults.standard.set(copyToClipboardEnabled, forKey: "copyToClipboardEnabled") }
     }
 
