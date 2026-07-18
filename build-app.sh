@@ -17,6 +17,7 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp .build/release/Marker "$APP/Contents/MacOS/Marker"
+cp .build/release/marker-cli "$APP/Contents/MacOS/marker-cli"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
@@ -32,6 +33,8 @@ install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/Mac
 IDENTITY="${MARKER_SIGN_IDENTITY:-Developer ID Application}"
 codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" \
   "$APP/Contents/Frameworks/Sparkle.framework"
+codesign --force --options runtime --timestamp --sign "$IDENTITY" \
+  "$APP/Contents/MacOS/marker-cli"
 codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
 
 echo "Built $APP"

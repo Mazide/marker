@@ -16,6 +16,11 @@ let package = Package(
             path: "Sources/Marker",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        .executableTarget(
+            name: "marker-cli",
+            path: "Sources/MarkerCLI",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .testTarget(
             name: "MarkerTests",
             dependencies: ["Marker"],

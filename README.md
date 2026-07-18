@@ -3,19 +3,18 @@
 # Marker
 
 Linux-style primary selection for macOS. Select text in any app — it is
-captured into Marker's history and (by default) placed on the system
-clipboard, ready to Cmd+V. Prefer your clipboard untouched? Turn off
-"To clipboard" and Marker runs in strict X11-primary mode: selections
-go to the separate history only.
+captured into Marker's history, a separate buffer that never touches
+your clipboard. Paste the latest selection with ⌥V or middle-click, or
+copy any entry to the clipboard explicitly from the popover.
 
 ## Features
 
 - Watches text selections system-wide via the Accessibility API.
 - Keeps formatting where the source app exposes it: captures carry
-  RTF/HTML flavors alongside plain text, so auto-copy, ⌥V and history
-  copies paste rich into targets that accept it.
-- Auto-copy to the system clipboard — on by default, toggleable for
-  strict separate-buffer mode.
+  RTF/HTML flavors alongside plain text, so ⌥V and history copies
+  paste rich into targets that accept it.
+- Strict separate-buffer mode: the system clipboard is never written
+  on capture, only on an explicit copy from the popover.
 - Fallback capture for apps that hide selections from Accessibility
   (Telegram, kitty, …): synthesized Cmd+C or detection of the app's own
   copy-on-select, with the previous clipboard restored afterwards.
@@ -24,9 +23,20 @@ go to the separate history only.
   auto-expiry (7/30/90 days) in Settings → History.
 - **⌥V** pastes the most recent selection into the active app. The system
   clipboard is briefly swapped and then restored.
+- **⇧⌥V** opens the history popover from anywhere.
 - Menu bar popover: click any history entry to copy it to the clipboard.
-- Secrets (API keys, tokens, private keys) reach your clipboard but are
-  never written to history.
+- Secrets (API keys, tokens, private keys) are never written to history.
+- Ignored apps (Settings → Ignored apps): selections in the listed apps
+  are never captured — no history entry, and the ⌘C fallback never fires
+  there. Put your password manager here.
+- `marker-cli`: history from the terminal — `latest`, `history`,
+  `search`, `copy [N]`, and `echo x | marker-cli add`, with `--json`
+  for scripting. Ships inside the app bundle:
+
+  ```sh
+  sudo ln -s /Applications/Marker.app/Contents/MacOS/marker-cli /usr/local/bin/marker
+  marker latest | pbcopy
+  ```
 - Delete single entries from the popover; clear everything from Settings.
 - Gear menu in the popover: Settings, Check for Updates, Quit.
 - Auto-updates via Sparkle.

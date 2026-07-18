@@ -66,6 +66,10 @@ final class CaptureEngine {
     /// Rich capture through a synthesized ⌘C in browsers and web views
     /// (their AX attributed reads are near-empty). Off: AX-only capture.
     var richViaCopyEnabled = true
+    /// Selections in these apps are never captured. Checked at the entry
+    /// gates so the ⌘C fallback can't fire either — synthesizing Copy in
+    /// a password manager would put the secret on the clipboard.
+    var excludedBundleIDs: Set<String> = []
 
     private let selection: SelectionReading
     private let pasteboard: PasteboardControlling
@@ -148,6 +152,16 @@ final class CaptureEngine {
     /// captured as a new selection.
     func externalPasteOccurred() {
         lastExternalPaste = now()
+        // Pasting over a pending selection is select-to-replace, the paste
+        // flavor of select-to-edit — the selection was a target, not a
+        // capture. Drop it before it reaches history (and the toast).
+        if let pending = pendingCommit,
+           frontmost.frontmostApp()?.bundleID == pending.app.bundleID {
+            pending.token.cancel()
+            pendingCommit = nil
+            lastReported = nil
+            markerLog.info("dropped select-to-replace capture (paste)")
+        }
     }
 
     /// AX selection-changed notification; fires on every caret move while
@@ -182,7 +196,9 @@ final class CaptureEngine {
 
     /// Mouse-up after a drag or a multi-click.
     func selectionGesture() {
-        guard let app = frontmost.frontmostApp(), !app.isSelf else { return }
+        guard let app = frontmost.frontmostApp(), !app.isSelf,
+              !excludedBundleIDs.contains(app.bundleID)
+        else { return }
         let downCount = downChangeCount
         // Give the app a beat to finalize the selection after mouse-up.
         scheduler.schedule(after: config.settleDelay) { [weak self] in
@@ -218,6 +234,7 @@ final class CaptureEngine {
             return
         }
         guard let app = frontmost.frontmostApp(), !app.isSelf,
+              !excludedBundleIDs.contains(app.bundleID),
               let text = selection.currentSelection()
         else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

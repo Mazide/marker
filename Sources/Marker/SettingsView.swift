@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import SwiftUI
 
 /// Two panes' worth of settings do not need a tab bar: one scrolling
@@ -37,18 +38,13 @@ private struct GeneralSettingsView: View {
 
             Section("Capture") {
                 SettingToggle(
-                    "Copy selections to the clipboard",
-                    caption: "Every selection is ready to ⌘V; off keeps it in Marker's history only.",
-                    isOn: Bindable(model).copyToClipboardEnabled
-                )
-                SettingToggle(
                     "Ignore selections you immediately edit",
                     caption: "Typing over a fresh selection cancels its capture.",
                     isOn: Bindable(model).retractEditedEnabled
                 )
                 SettingToggle(
                     "Never save secrets",
-                    caption: "Keys and tokens reach the clipboard but stay out of history.",
+                    caption: "Keys and tokens are never captured into history.",
                     isOn: Bindable(model).skipSecretsEnabled
                 )
                 SettingToggle(
@@ -56,6 +52,48 @@ private struct GeneralSettingsView: View {
                     caption: "Keeps real formatting from web content.",
                     detail: "Browsers and web-based apps (Slack, Discord, …) expose their formatting only through their own Copy command. When you select text there, Marker synthesizes a brief ⌘C to grab the formatted copy, then restores your clipboard.",
                     isOn: Bindable(model).richCopyEnabled
+                )
+            }
+
+            Section {
+                ForEach(model.excludedBundleIDs, id: \.self) { bundleID in
+                    HStack(spacing: 8) {
+                        Image(nsImage: AppIcons.icon(for: bundleID))
+                            .resizable()
+                            .frame(width: 16, height: 16)
+                        Text(Self.appDisplayName(for: bundleID))
+                        Spacer()
+                        Button {
+                            model.excludedBundleIDs.removeAll { $0 == bundleID }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Stop ignoring")
+                    }
+                }
+                addIgnoredAppMenu
+            } header: {
+                Text("Ignored apps")
+            } footer: {
+                Text("Selections in these apps are never captured — no history entry, no ⌘C fallback.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Shortcuts") {
+                HotkeyRecorder(
+                    "Paste latest selection",
+                    combo: Bindable(model).pasteHotkey,
+                    defaultCombo: AppModel.defaultPasteCombo,
+                    isTaken: { $0 == model.historyHotkey }
+                )
+                HotkeyRecorder(
+                    "Open history",
+                    combo: Bindable(model).historyHotkey,
+                    defaultCombo: AppModel.defaultHistoryCombo,
+                    isTaken: { $0 == model.pasteHotkey }
                 )
             }
 
@@ -103,6 +141,49 @@ private struct GeneralSettingsView: View {
         .formStyle(.grouped)
     }
 
+    /// Running regular apps first — the app someone wants to ignore is
+    /// usually open right now — with an open panel for everything else.
+    private var addIgnoredAppMenu: some View {
+        Menu("Add App…") {
+            let running = NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular }
+                .compactMap(\.bundleIdentifier)
+                .filter { $0 != Bundle.main.bundleIdentifier && !model.excludedBundleIDs.contains($0) }
+                .sorted { Self.appDisplayName(for: $0) < Self.appDisplayName(for: $1) }
+            ForEach(running, id: \.self) { bundleID in
+                Button {
+                    model.excludedBundleIDs.append(bundleID)
+                } label: {
+                    Image(nsImage: AppIcons.icon(for: bundleID))
+                    Text(Self.appDisplayName(for: bundleID))
+                }
+            }
+            Divider()
+            Button("Other…") { pickIgnoredApp() }
+        }
+        .fixedSize()
+    }
+
+    private func pickIgnoredApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(filePath: "/Applications")
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url,
+              let bundleID = Bundle(url: url)?.bundleIdentifier,
+              !model.excludedBundleIDs.contains(bundleID)
+        else { return }
+        model.excludedBundleIDs.append(bundleID)
+    }
+
+    private static func appDisplayName(for bundleID: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            return bundleID
+        }
+        return FileManager.default.displayName(atPath: url.path)
+            .replacingOccurrences(of: ".app", with: "")
+    }
+
     private var footer: some View {
         HStack(spacing: 14) {
             Link("Website", destination: URL(string: "https://getmarkerapp.net")!)
@@ -112,6 +193,112 @@ private struct GeneralSettingsView: View {
         .font(.caption)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
+    }
+}
+
+/// Click-to-record shortcut field. While recording, a local key monitor
+/// grabs the next chord: Esc cancels, a chord without modifiers is
+/// refused (bare letters must keep typing), a chord already used by the
+/// other action beeps. Key codes are stored, so shortcuts survive layout
+/// switches; the label shows what was typed at record time.
+private struct HotkeyRecorder: View {
+    let title: LocalizedStringKey
+    @Binding var combo: KeyCombo
+    let defaultCombo: KeyCombo
+    let isTaken: (KeyCombo) -> Bool
+
+    @State private var isRecording = false
+    @State private var monitor: Any?
+
+    init(
+        _ title: LocalizedStringKey,
+        combo: Binding<KeyCombo>,
+        defaultCombo: KeyCombo,
+        isTaken: @escaping (KeyCombo) -> Bool
+    ) {
+        self.title = title
+        self._combo = combo
+        self.defaultCombo = defaultCombo
+        self.isTaken = isTaken
+    }
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                if combo != defaultCombo, !isRecording {
+                    Button {
+                        combo = defaultCombo
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Reset to \(defaultCombo.label)")
+                }
+                Button(isRecording ? "Type shortcut…" : combo.label) {
+                    isRecording ? stopRecording() : startRecording()
+                }
+                .font(isRecording ? .body : .body.monospaced())
+            }
+        }
+        .onDisappear { stopRecording() }
+    }
+
+    private func startRecording() {
+        isRecording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) {
+                stopRecording()
+                return nil
+            }
+            let flags = event.modifierFlags.intersection([.control, .option, .shift, .command])
+            guard !flags.isEmpty else {
+                NSSound.beep()
+                return nil
+            }
+            let candidate = KeyCombo(
+                keyCode: UInt32(event.keyCode),
+                modifiers: KeyCombo.carbonModifiers(from: flags),
+                label: Self.label(for: event, flags: flags)
+            )
+            guard !isTaken(candidate) else {
+                NSSound.beep()
+                return nil
+            }
+            combo = candidate
+            stopRecording()
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        isRecording = false
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    private static func label(for event: NSEvent, flags: NSEvent.ModifierFlags) -> String {
+        var parts = ""
+        if flags.contains(.control) { parts += "⌃" }
+        if flags.contains(.option) { parts += "⌥" }
+        if flags.contains(.shift) { parts += "⇧" }
+        if flags.contains(.command) { parts += "⌘" }
+        return parts + keyName(for: event)
+    }
+
+    private static func keyName(for event: NSEvent) -> String {
+        let special: [Int: String] = [
+            kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "⇥",
+            kVK_Delete: "⌫", kVK_ForwardDelete: "⌦",
+            kVK_LeftArrow: "←", kVK_RightArrow: "→",
+            kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+            kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟",
+            kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4",
+            kVK_F5: "F5", kVK_F6: "F6", kVK_F7: "F7", kVK_F8: "F8",
+            kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
+        ]
+        if let name = special[Int(event.keyCode)] { return name }
+        return event.charactersIgnoringModifiers?.uppercased() ?? "?"
     }
 }
 

@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 import Observation
 import ServiceManagement
 import Sparkle
@@ -34,14 +35,43 @@ final class AppModel {
         }
     }
 
-    /// Classic auto-copy: captured selections also land on the system
-    /// clipboard. Off = strict X11-primary mode (history only).
-    var copyToClipboardEnabled: Bool = UserDefaults.standard.object(forKey: "copyToClipboardEnabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(copyToClipboardEnabled, forKey: "copyToClipboardEnabled") }
-    }
-
     var toastEnabled: Bool = UserDefaults.standard.object(forKey: "toastEnabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
+    }
+
+    static let defaultPasteCombo = KeyCombo(
+        keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey), label: "⌥V")
+    static let defaultHistoryCombo = KeyCombo(
+        keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey | shiftKey), label: "⇧⌥V")
+
+    var pasteHotkey: KeyCombo = AppModel.storedCombo("pasteHotkey") ?? AppModel.defaultPasteCombo {
+        didSet { AppModel.store(pasteHotkey, forKey: "pasteHotkey"); registerHotkeys() }
+    }
+    var historyHotkey: KeyCombo = AppModel.storedCombo("historyHotkey") ?? AppModel.defaultHistoryCombo {
+        didSet { AppModel.store(historyHotkey, forKey: "historyHotkey"); registerHotkeys() }
+    }
+
+    private static func storedCombo(_ key: String) -> KeyCombo? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(KeyCombo.self, from: data)
+    }
+
+    private static func store(_ combo: KeyCombo, forKey key: String) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(combo), forKey: key)
+    }
+
+    private func registerHotkeys() {
+        hotkey.register([.pasteLatest: pasteHotkey, .showHistory: historyHotkey])
+    }
+
+    /// Bundle IDs whose selections are never captured (password managers,
+    /// anything private). Enforced inside CaptureEngine, before the ⌘C
+    /// fallback can touch the app's clipboard.
+    var excludedBundleIDs: [String] = UserDefaults.standard.stringArray(forKey: "excludedBundleIDs") ?? [] {
+        didSet {
+            UserDefaults.standard.set(excludedBundleIDs, forKey: "excludedBundleIDs")
+            engine.excludedBundleIDs = Set(excludedBundleIDs)
+        }
     }
 
     /// X11-style middle-click paste at the click point. Off by default;
@@ -151,6 +181,7 @@ final class AppModel {
         }
         engine.retractionEnabled = retractEditedEnabled
         engine.richViaCopyEnabled = richCopyEnabled
+        engine.excludedBundleIDs = Set(excludedBundleIDs)
         pasteEngine.onPaste = { [weak self] in
             self?.engine.externalPasteOccurred()
         }
@@ -163,14 +194,20 @@ final class AppModel {
         engine.onCapture = { [weak self] content, app, _ in
             self?.ingest(content: content, app: app)
         }
-        hotkey.onHotkey = { [weak self] in
-            guard let self, let item = self.history.items.first else { return }
-            self.pasteEngine.pasteIntoActiveApp(item.content)
+        hotkey.onHotkey = { [weak self] key in
+            guard let self else { return }
+            switch key {
+            case .pasteLatest:
+                guard let item = self.itemToPaste() else { return }
+                self.pasteEngine.pasteIntoActiveApp(item.content)
+            case .showHistory:
+                self.openHistoryPopover()
+            }
         }
         middleClickTap.onMiddleClick = { [weak self] point in
             guard let self, self.middleClickPasteEnabled, self.axTrusted,
                   self.shouldPasteAtCursor(input: "middle-click"),
-                  let item = self.history.items.first
+                  let item = self.itemToPaste()
             else { return false }
             _ = point
             // Paste into the current focus, same as ⌥V.
@@ -184,7 +221,7 @@ final class AppModel {
         threeFingerClickTap.onThreeFingerClick = { [weak self] in
             guard let self, self.threeFingerPasteMode == .click, self.axTrusted,
                   self.shouldPasteAtCursor(input: "three-finger click"),
-                  let item = self.history.items.first
+                  let item = self.itemToPaste()
             else { return false }
             self.pasteEngine.pasteIntoActiveApp(item.content)
             ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerClick)
@@ -193,7 +230,7 @@ final class AppModel {
         trackpadTap.onThreeFingerDoubleTap = { [weak self] in
             guard let self, self.threeFingerPasteMode == .doubleTap, self.axTrusted,
                   self.shouldPasteAtCursor(input: "three-finger double tap"),
-                  let item = self.history.items.first
+                  let item = self.itemToPaste()
             else { return }
             self.pasteEngine.pasteIntoActiveApp(item.content)
             ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerDoubleTap)
@@ -201,7 +238,7 @@ final class AppModel {
         if threeFingerPasteMode != .off {
             trackpadTap.start()
         }
-        hotkey.register()
+        registerHotkeys()
 
         history.applyRetention(days: historyRetentionDays)
         retentionTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
@@ -257,27 +294,39 @@ final class AppModel {
         pasteboard.writeContent(item.content)
     }
 
+    /// SwiftUI's MenuBarExtra has no public API to open its window, so the
+    /// hotkey presses the status item's button the way a click would. The
+    /// KVC key is private ("statusItem" on NSStatusBarWindow) — probed with
+    /// responds(to:) first so an OS change degrades to a log line, not a
+    /// crash.
+    func openHistoryPopover() {
+        guard let window = NSApp.windows.first(where: { $0.className == "NSStatusBarWindow" }),
+              window.responds(to: Selector(("statusItem"))),
+              let item = window.value(forKey: "statusItem") as? NSStatusItem,
+              let button = item.button
+        else {
+            markerLog.error("history hotkey: status item button not reachable")
+            return
+        }
+        button.performClick(nil)
+    }
+
     func openAccessibilitySettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
     }
 
     private func ingest(content: RichText, app: SourceApp) {
-        // Secrets pass through to the clipboard (the user selected them on
-        // purpose) but are never persisted to history.
+        // The clipboard stays the user's: captures land in history only,
+        // and reach the pasteboard solely through an explicit copy in the
+        // popover.
         if skipSecretsEnabled, SecretDetector.looksSecret(content.plain) {
             markerLog.info("skipped a selection that looks like a secret")
-            if copyToClipboardEnabled {
-                pasteboard.writeContent(content)
-            }
             return
         }
 
         let isNew = history.items.first?.text != content.plain
         let saved = history.push(content, app: app)
-        if copyToClipboardEnabled {
-            pasteboard.writeContent(content)
-        }
         if isNew, toastEnabled {
             ToastPresenter.shared.show(
                 text: content.plain,
@@ -286,6 +335,24 @@ final class AppModel {
                 warning: saved ? nil : "Couldn't save to history"
             )
         }
+    }
+
+    /// What ⌥V and the click gestures should paste — usually the newest
+    /// entry, but never a selection onto itself (PastePolicy). When the
+    /// newest entry is skipped it was a select-to-replace target, not a
+    /// wanted capture — the paste wipes it from the screen, so retract it
+    /// from history too.
+    private func itemToPaste() -> SelectionItem? {
+        let items = history.items
+        let picked = PastePolicy.item(
+            history: items,
+            currentSelection: axMonitor.currentSelection()
+        )
+        if let picked, let first = items.first, picked.id != first.id {
+            history.delete(first)
+            markerLog.info("retracted select-to-replace capture from history")
+        }
+        return picked
     }
 
     /// Shared gate for middle-click and three-finger click; both paste into

@@ -6,6 +6,10 @@ struct HistoryView: View {
     @Environment(\.openSettings) private var openSettingsAction
     @State private var searchText = ""
     @State private var filterBundleID: String?
+    @FocusState private var searchFocused: Bool
+    /// Keyboard selection, Spotlight-style: the first row is preselected,
+    /// arrows move it, Return copies it — all while search keeps focus.
+    @State private var selectedID: UUID?
 
     private func openSettings() {
         dismiss()
@@ -21,6 +25,42 @@ struct HistoryView: View {
             footer
         }
         .frame(width: 360)
+        .onAppear {
+            // Typing right after ⇧⌥V should land in search. The async hop
+            // waits out the popover window becoming key; setting the focus
+            // synchronously here is dropped.
+            DispatchQueue.main.async { searchFocused = true }
+            selectedID = filteredItems.first?.id
+        }
+        .onChange(of: searchText) { _, _ in selectedID = filteredItems.first?.id }
+        .onChange(of: filterBundleID) { _, _ in selectedID = filteredItems.first?.id }
+        .onKeyPress(.downArrow) { moveSelection(by: 1) }
+        .onKeyPress(.upArrow) { moveSelection(by: -1) }
+        .onKeyPress(.return) { copySelected() }
+        .onKeyPress(.escape) {
+            // Standard search-field staging: first Esc clears the query,
+            // the next one closes the popover.
+            guard !searchText.isEmpty else { return .ignored }
+            searchText = ""
+            return .handled
+        }
+    }
+
+    private func moveSelection(by offset: Int) -> KeyPress.Result {
+        let items = filteredItems
+        guard !items.isEmpty else { return .ignored }
+        let current = items.firstIndex { $0.id == selectedID } ?? -1
+        let next = min(max(current + offset, 0), items.count - 1)
+        selectedID = items[next].id
+        return .handled
+    }
+
+    private func copySelected() -> KeyPress.Result {
+        guard let item = filteredItems.first(where: { $0.id == selectedID }) ?? filteredItems.first
+        else { return .ignored }
+        model.copyToClipboard(item)
+        dismiss()
+        return .handled
     }
 
     static let accent = Color(red: 0.91, green: 0.46, blue: 0.05)
@@ -45,6 +85,7 @@ struct HistoryView: View {
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.body)
+                .focused($searchFocused)
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -132,7 +173,7 @@ struct HistoryView: View {
             EmptyState(
                 icon: "cursorarrow.motionlines",
                 title: "Nothing here yet",
-                message: "Select text in any app — it lands here, already copied."
+                message: "Select text in any app — it lands here, ready to copy or paste."
             )
         } else if filteredItems.isEmpty {
             EmptyState(
@@ -141,13 +182,15 @@ struct HistoryView: View {
                 message: "Nothing selected like that. Try fewer letters or another app filter."
             )
         } else {
-            ScrollView {
+            ScrollViewReader { proxy in
+                ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     ForEach(dayGroups, id: \.day) { group in
                         Section {
                             ForEach(group.items) { item in
                                 HistoryRow(
                                     item: item,
+                                    isSelected: item.id == selectedID,
                                     onCopy: {
                                         model.copyToClipboard(item)
                                         dismiss()
@@ -176,8 +219,13 @@ struct HistoryView: View {
                     }
                 }
                 .padding(.bottom, 6)
+                }
+                .frame(maxHeight: 420)
+                .onChange(of: selectedID) { _, id in
+                    guard let id else { return }
+                    proxy.scrollTo(id)
+                }
             }
-            .frame(maxHeight: 420)
         }
     }
 
@@ -185,7 +233,7 @@ struct HistoryView: View {
 
     private var footer: some View {
         HStack {
-            Text("⌥V pastes latest")
+            Text("↩ copies · \(model.pasteHotkey.label) pastes latest")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -267,6 +315,7 @@ private struct EmptyState: View {
 /// on it, the way a Finder or Spotlight row does.
 private struct HistoryRow: View {
     let item: SelectionItem
+    let isSelected: Bool
     let onCopy: () -> Void
     let onDelete: () -> Void
 
@@ -353,14 +402,25 @@ private struct HistoryRow: View {
                         .foregroundStyle(.tertiary)
                         .opacity(isHovered ? 0 : 1)
 
-                    Button(action: onDelete) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .contentShape(Rectangle())
+                    HStack(spacing: 8) {
+                        Button(action: onCopy) {
+                            Image(systemName: "doc.on.doc.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy to clipboard")
+
+                        Button(action: onDelete) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Delete")
                     }
-                    .buttonStyle(.plain)
-                    .help("Delete")
                     .opacity(isHovered ? 1 : 0)
                     .allowsHitTesting(isHovered)
                 }
@@ -374,8 +434,10 @@ private struct HistoryRow: View {
         .buttonStyle(.plain)
         .background {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(.quaternary)
-                .opacity(isHovered ? 1 : 0)
+                .fill(isSelected
+                      ? AnyShapeStyle(HistoryView.accent.opacity(0.22))
+                      : AnyShapeStyle(.quaternary))
+                .opacity(isSelected || isHovered ? 1 : 0)
         }
         .padding(.horizontal, 6)
         .onHover { isHovered = $0 }

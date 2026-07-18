@@ -166,7 +166,7 @@ private struct ToastView: View {
                     .frame(width: 14, height: 14)
                 Text("Marker")
                     .font(.caption2.weight(.semibold))
-                Text("· copied from")
+                Text("· captured from")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Image(nsImage: AppIcons.icon(for: bundleID))
