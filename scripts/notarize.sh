@@ -37,7 +37,16 @@ mkdir -p "$DMG_STAGE"
 cp -R "$APP" "$DMG_STAGE/"
 ln -s /Applications "$DMG_STAGE/Applications"
 hdiutil create -volname "Marker" -srcfolder "$DMG_STAGE" -fs HFS+ -ov -format UDZO "$DMG"
-xcrun stapler staple "$DMG" || true
+
+# The DMG needs its own ticket: the app's ticket does not cover the
+# container, and stapling requires one per file. Second submit is quick —
+# the nested app is already notarized.
+echo "==> Notarizing DMG (submit + wait)…"
+xcrun notarytool submit "$DMG" --keychain-profile "$KEYCHAIN_PROFILE" --wait
+
+echo "==> Stapling DMG…"
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
 
 echo
 echo "✅ Done: $DMG"
