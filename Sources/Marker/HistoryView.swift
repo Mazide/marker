@@ -132,7 +132,7 @@ struct HistoryView: View {
             EmptyState(
                 icon: "cursorarrow.motionlines",
                 title: "Nothing here yet",
-                message: "Select text in any app — it lands here, already copied."
+                message: "Select text in any app — it lands here, ready to copy or paste."
             )
         } else if filteredItems.isEmpty {
             EmptyState(
@@ -353,14 +353,25 @@ private struct HistoryRow: View {
                         .foregroundStyle(.tertiary)
                         .opacity(isHovered ? 0 : 1)
 
-                    Button(action: onDelete) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .contentShape(Rectangle())
+                    HStack(spacing: 8) {
+                        Button(action: onCopy) {
+                            Image(systemName: "doc.on.doc.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy to clipboard")
+
+                        Button(action: onDelete) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Delete")
                     }
-                    .buttonStyle(.plain)
-                    .help("Delete")
                     .opacity(isHovered ? 1 : 0)
                     .allowsHitTesting(isHovered)
                 }

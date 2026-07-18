@@ -37,18 +37,13 @@ private struct GeneralSettingsView: View {
 
             Section("Capture") {
                 SettingToggle(
-                    "Copy selections to the clipboard",
-                    caption: "Every selection is ready to ⌘V; off keeps it in Marker's history only.",
-                    isOn: Bindable(model).copyToClipboardEnabled
-                )
-                SettingToggle(
                     "Ignore selections you immediately edit",
                     caption: "Typing over a fresh selection cancels its capture.",
                     isOn: Bindable(model).retractEditedEnabled
                 )
                 SettingToggle(
                     "Never save secrets",
-                    caption: "Keys and tokens reach the clipboard but stay out of history.",
+                    caption: "Keys and tokens are never captured into history.",
                     isOn: Bindable(model).skipSecretsEnabled
                 )
                 SettingToggle(

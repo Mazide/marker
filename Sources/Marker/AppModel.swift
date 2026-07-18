@@ -34,12 +34,6 @@ final class AppModel {
         }
     }
 
-    /// Classic auto-copy: captured selections also land on the system
-    /// clipboard. Off = strict X11-primary mode (history only).
-    var copyToClipboardEnabled: Bool = UserDefaults.standard.object(forKey: "copyToClipboardEnabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(copyToClipboardEnabled, forKey: "copyToClipboardEnabled") }
-    }
-
     var toastEnabled: Bool = UserDefaults.standard.object(forKey: "toastEnabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
     }
@@ -263,21 +257,16 @@ final class AppModel {
     }
 
     private func ingest(content: RichText, app: SourceApp) {
-        // Secrets pass through to the clipboard (the user selected them on
-        // purpose) but are never persisted to history.
+        // The clipboard stays the user's: captures land in history only,
+        // and reach the pasteboard solely through an explicit copy in the
+        // popover.
         if skipSecretsEnabled, SecretDetector.looksSecret(content.plain) {
             markerLog.info("skipped a selection that looks like a secret")
-            if copyToClipboardEnabled {
-                pasteboard.writeContent(content)
-            }
             return
         }
 
         let isNew = history.items.first?.text != content.plain
         let saved = history.push(content, app: app)
-        if copyToClipboardEnabled {
-            pasteboard.writeContent(content)
-        }
         if isNew, toastEnabled {
             ToastPresenter.shared.show(
                 text: content.plain,

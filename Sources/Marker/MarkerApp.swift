@@ -2,7 +2,7 @@ import SwiftUI
 
 /*
 Marker
-Select text. It's already copied.
+Select text. It's already saved.
 */
 @main
 struct MarkerApp: App {
