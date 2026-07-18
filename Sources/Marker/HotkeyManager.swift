@@ -1,24 +1,67 @@
+import AppKit
 import Carbon.HIToolbox
 import Foundation
 
+/// A user-assignable global shortcut: Carbon key code + Carbon modifier
+/// mask, plus the display label rendered at record time (key codes are
+/// layout-independent, labels are not).
+struct KeyCombo: Codable, Equatable {
+    var keyCode: UInt32
+    var modifiers: UInt32
+    var label: String
+
+    static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var mods: UInt32 = 0
+        if flags.contains(.control) { mods |= UInt32(controlKey) }
+        if flags.contains(.option) { mods |= UInt32(optionKey) }
+        if flags.contains(.shift) { mods |= UInt32(shiftKey) }
+        if flags.contains(.command) { mods |= UInt32(cmdKey) }
+        return mods
+    }
+}
+
 /// Registers global hotkeys via the Carbon hotkey API. Unlike NSEvent
 /// global monitors, RegisterEventHotKey consumes the keystroke, so "√"
-/// is not typed into the focused app.
+/// is not typed into the focused app. Re-registrable: assigning a new
+/// combo in Settings unregisters the old ones and applies the new set.
 final class HotkeyManager {
     /// Marker's global hotkeys. Raw value doubles as the Carbon hotkey ID.
     enum Hotkey: UInt32 {
-        /// ⌥V — paste the latest selection into the active app.
+        /// Paste the latest selection into the active app (default ⌥V).
         case pasteLatest = 1
-        /// ⇧⌥V — open the history popover.
+        /// Open the history popover (default ⇧⌥V).
         case showHistory = 2
     }
 
     var onHotkey: ((Hotkey) -> Void)?
 
-    private var hotKeyRefs: [EventHotKeyRef?] = []
+    private var hotKeyRefs: [EventHotKeyRef] = []
     private var handlerRef: EventHandlerRef?
 
-    func register() {
+    func register(_ combos: [Hotkey: KeyCombo]) {
+        installHandlerIfNeeded()
+        for ref in hotKeyRefs { UnregisterEventHotKey(ref) }
+        hotKeyRefs.removeAll()
+
+        let signature = OSType(0x4D52_4B52) // 'MRKR'
+        var errs: [OSStatus] = []
+        for (key, combo) in combos.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+            var ref: EventHotKeyRef?
+            errs.append(RegisterEventHotKey(
+                combo.keyCode,
+                combo.modifiers,
+                EventHotKeyID(signature: signature, id: key.rawValue),
+                GetApplicationEventTarget(),
+                0,
+                &ref
+            ))
+            if let ref { hotKeyRefs.append(ref) }
+        }
+        markerLog.info("hotkey register: \(errs)")
+    }
+
+    private func installHandlerIfNeeded() {
+        guard handlerRef == nil else { return }
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -48,24 +91,8 @@ final class HotkeyManager {
             userData,
             &handlerRef
         )
-
-        let signature = OSType(0x4D52_4B52) // 'MRKR'
-        var errs: [OSStatus] = []
-        for (key, modifiers) in [
-            (Hotkey.pasteLatest, UInt32(optionKey)),
-            (Hotkey.showHistory, UInt32(optionKey | shiftKey)),
-        ] {
-            var ref: EventHotKeyRef?
-            errs.append(RegisterEventHotKey(
-                UInt32(kVK_ANSI_V),
-                modifiers,
-                EventHotKeyID(signature: signature, id: key.rawValue),
-                GetApplicationEventTarget(),
-                0,
-                &ref
-            ))
-            hotKeyRefs.append(ref)
+        if installErr != noErr {
+            markerLog.error("hotkey handler install failed: \(installErr)")
         }
-        markerLog.info("hotkey register: handler=\(installErr) hotkeys=\(errs)")
     }
 }

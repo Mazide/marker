@@ -233,7 +233,7 @@ struct HistoryView: View {
 
     private var footer: some View {
         HStack {
-            Text("↩ copies · ⌥V pastes latest")
+            Text("↩ copies · \(model.pasteHotkey.label) pastes latest")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()

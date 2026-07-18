@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 import Observation
 import ServiceManagement
 import Sparkle
@@ -36,6 +37,31 @@ final class AppModel {
 
     var toastEnabled: Bool = UserDefaults.standard.object(forKey: "toastEnabled") as? Bool ?? true {
         didSet { UserDefaults.standard.set(toastEnabled, forKey: "toastEnabled") }
+    }
+
+    static let defaultPasteCombo = KeyCombo(
+        keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey), label: "⌥V")
+    static let defaultHistoryCombo = KeyCombo(
+        keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey | shiftKey), label: "⇧⌥V")
+
+    var pasteHotkey: KeyCombo = AppModel.storedCombo("pasteHotkey") ?? AppModel.defaultPasteCombo {
+        didSet { AppModel.store(pasteHotkey, forKey: "pasteHotkey"); registerHotkeys() }
+    }
+    var historyHotkey: KeyCombo = AppModel.storedCombo("historyHotkey") ?? AppModel.defaultHistoryCombo {
+        didSet { AppModel.store(historyHotkey, forKey: "historyHotkey"); registerHotkeys() }
+    }
+
+    private static func storedCombo(_ key: String) -> KeyCombo? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(KeyCombo.self, from: data)
+    }
+
+    private static func store(_ combo: KeyCombo, forKey key: String) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(combo), forKey: key)
+    }
+
+    private func registerHotkeys() {
+        hotkey.register([.pasteLatest: pasteHotkey, .showHistory: historyHotkey])
     }
 
     /// Bundle IDs whose selections are never captured (password managers,
@@ -212,7 +238,7 @@ final class AppModel {
         if threeFingerPasteMode != .off {
             trackpadTap.start()
         }
-        hotkey.register()
+        registerHotkeys()
 
         history.applyRetention(days: historyRetentionDays)
         retentionTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
