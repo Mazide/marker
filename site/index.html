@@ -88,6 +88,18 @@
       background: #e8930c;
     }
 
+    code {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 13.5px;
+      color: #33302b;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      code {
+        color: #e6dfd3;
+      }
+    }
+
     kbd {
       font-family: inherit;
       font-size: 14px;
@@ -211,6 +223,10 @@
       <li>
         <b>Nothing gets lost.</b>
         Every selection stays in the menu bar: search it, browse it by app, or find what you selected last week. API keys and tokens are never saved.
+      </li>
+      <li>
+        <b>Scriptable, three ways.</b>
+        A <kbd>marker</kbd> CLI for pipes (<code>marker latest | jq</code>), Shortcuts/Spotlight/Siri actions, and <code>marker://</code> URLs for launchers and macros. Your selections become plumbing.
       </li>
     </ul>
     <div class="buttons">
