@@ -41,6 +41,49 @@ copy any entry to the clipboard explicitly from the popover.
 - Gear menu in the popover: Settings, Check for Updates, Quit.
 - Auto-updates via Sparkle.
 
+## Automation
+
+Marker exposes the same history three ways — pick whatever your tool
+speaks:
+
+- **`marker-cli`** for shells and anything that can run a command.
+- **App Intents** for Shortcuts, Spotlight, and Siri: *Get Latest
+  Selection*, *Search History*, *Copy Entry to Clipboard*. Raycast and
+  Alfred can run Shortcuts, so these work there too.
+- **`marker://` URL scheme** for tools that speak URLs:
+
+  ```
+  marker://show                open the history popover
+  marker://search?q=invoice    open the popover with a query typed
+  marker://copy                copy the newest entry to the clipboard
+  marker://copy?position=3     …or the 3rd newest
+  marker://add?text=hello      add text to history
+  ```
+
+### Recipes
+
+```sh
+# Pipe the latest selection anywhere
+marker latest | jq -r .          # (after the symlink from Build & run)
+
+# Log every URL you select
+marker search "://" --json | jq -r '.[].text'
+
+# Feed a command's output into Marker, paste it later with ⌥V
+git log --oneline -1 | marker add
+
+# Pop the history popover pre-filtered, from any launcher or bookmark
+open "marker://search?q=TODO"
+```
+
+- **Vim**: `:r !marker latest` inserts the latest selection.
+- **tmux**: `bind-key M run-shell "tmux set-buffer \"$(marker latest)\""`.
+- **Hammerspoon**: `hs.hotkey.bind({"cmd","alt"}, "m", function()
+  hs.eventtap.keyStrokes(hs.execute("/usr/local/bin/marker latest")) end)`.
+- **Keyboard Maestro / BetterTouchTool**: "Execute Shell Script" with
+  `marker latest`, or "Open URL" with `marker://show`.
+- **Shortcuts**: search for "Marker" in the actions list.
+
 ## Build & run
 
 ```sh

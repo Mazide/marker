@@ -95,6 +95,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppModel.shared.start()
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let command = URLCommand.parse(url) else {
+                markerLog.error("unrecognized URL: \(url.absoluteString, privacy: .public)")
+                continue
+            }
+            AppModel.shared.handle(command)
+        }
+    }
+
     private static func otherRunningInstance() -> NSRunningApplication? {
         guard let bundleID = Bundle.main.bundleIdentifier else { return nil }
         return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)

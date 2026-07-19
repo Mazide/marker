@@ -30,8 +30,10 @@ struct HistoryView: View {
             // waits out the popover window becoming key; setting the focus
             // synchronously here is dropped.
             DispatchQueue.main.async { searchFocused = true }
+            adoptSearchRequest()
             selectedID = filteredItems.first?.id
         }
+        .onChange(of: model.popoverSearchRequest) { _, _ in adoptSearchRequest() }
         .onChange(of: searchText) { _, _ in selectedID = filteredItems.first?.id }
         .onChange(of: filterBundleID) { _, _ in selectedID = filteredItems.first?.id }
         .onKeyPress(.downArrow) { moveSelection(by: 1) }
@@ -44,6 +46,13 @@ struct HistoryView: View {
             searchText = ""
             return .handled
         }
+    }
+
+    /// marker://search landed a query for the popover.
+    private func adoptSearchRequest() {
+        guard let query = model.popoverSearchRequest else { return }
+        model.popoverSearchRequest = nil
+        searchText = query
     }
 
     private func moveSelection(by offset: Int) -> KeyPress.Result {
