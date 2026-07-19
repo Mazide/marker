@@ -30,6 +30,7 @@ struct HistoryView: View {
             // waits out the popover window becoming key; setting the focus
             // synchronously here is dropped.
             DispatchQueue.main.async { searchFocused = true }
+            model.history.refresh()
             adoptSearchRequest()
             selectedID = filteredItems.first?.id
         }

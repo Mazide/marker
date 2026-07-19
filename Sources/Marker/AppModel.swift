@@ -306,6 +306,7 @@ final class AppModel {
             popoverSearchRequest = query
             openHistoryPopover()
         case .copy(let position):
+            history.refresh()
             let items = history.items
             guard items.count >= position else {
                 markerLog.error("marker://copy: only \(items.count) entries, wanted \(position)")
@@ -369,6 +370,7 @@ final class AppModel {
     /// wanted capture — the paste wipes it from the screen, so retract it
     /// from history too.
     private func itemToPaste() -> SelectionItem? {
+        history.refresh() // marker-cli may have added entries behind our back
         let items = history.items
         let picked = PastePolicy.item(
             history: items,

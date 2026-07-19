@@ -27,6 +27,7 @@ struct GetLatestSelectionIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        AppModel.shared.history.refresh()
         guard let item = AppModel.shared.history.items.first else {
             throw MarkerIntentError.emptyHistory
         }
@@ -72,6 +73,7 @@ struct CopyEntryIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        AppModel.shared.history.refresh()
         let items = AppModel.shared.history.items
         guard items.count >= position else {
             throw MarkerIntentError.notEnoughEntries(available: items.count)

@@ -31,12 +31,9 @@ copy any entry to the clipboard explicitly from the popover.
   there. Put your password manager here.
 - `marker-cli`: history from the terminal — `latest`, `history`,
   `search`, `copy [N]`, and `echo x | marker-cli add`, with `--json`
-  for scripting. Ships inside the app bundle:
-
-  ```sh
-  sudo ln -s /Applications/Marker.app/Contents/MacOS/marker-cli /usr/local/bin/marker
-  marker latest | pbcopy
-  ```
+  for scripting. Ships inside the app bundle; install the `marker`
+  command from **Settings → Command Line** (or symlink it yourself:
+  `ln -s /Applications/Marker.app/Contents/MacOS/marker-cli /usr/local/bin/marker`).
 - Delete single entries from the popover; clear everything from Settings.
 - Gear menu in the popover: Settings, Check for Updates, Quit.
 - Auto-updates via Sparkle.
