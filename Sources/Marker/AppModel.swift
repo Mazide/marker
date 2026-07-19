@@ -294,6 +294,33 @@ final class AppModel {
         pasteboard.writeContent(item.content)
     }
 
+    /// Search query the popover should adopt (marker://search). Cleared by
+    /// HistoryView once applied.
+    var popoverSearchRequest: String?
+
+    func handle(_ command: URLCommand) {
+        switch command {
+        case .show:
+            openHistoryPopover()
+        case .search(let query):
+            popoverSearchRequest = query
+            openHistoryPopover()
+        case .copy(let position):
+            history.refresh()
+            let items = history.items
+            guard items.count >= position else {
+                markerLog.error("marker://copy: only \(items.count) entries, wanted \(position)")
+                return
+            }
+            copyToClipboard(items[position - 1])
+        case .add(let text):
+            _ = history.push(
+                RichText(plain: text),
+                app: SourceApp(pid: 0, bundleID: "url.marker.add", name: "Automation", isSelf: false)
+            )
+        }
+    }
+
     /// SwiftUI's MenuBarExtra has no public API to open its window, so the
     /// hotkey presses the status item's button the way a click would. The
     /// KVC key is private ("statusItem" on NSStatusBarWindow) — probed with
@@ -343,6 +370,7 @@ final class AppModel {
     /// wanted capture — the paste wipes it from the screen, so retract it
     /// from history too.
     private func itemToPaste() -> SelectionItem? {
+        history.refresh() // marker-cli may have added entries behind our back
         let items = history.items
         let picked = PastePolicy.item(
             history: items,

@@ -16,6 +16,22 @@ final class HistoryStoreTests: XCTestCase {
         store = HistoryStore(db: db, now: { [unowned self] in self.clock })
     }
 
+    func testRefreshPicksUpExternalWrites() {
+        store.push(text: "captured by the app", app: telegram)
+
+        // marker-cli inserts straight into the database, newer than
+        // anything the app knows about.
+        clock = clock.addingTimeInterval(60)
+        db.insert(SelectionItem(
+            id: UUID(), text: "added by cli", date: clock,
+            appName: "Terminal", bundleID: "cli.marker.add"))
+        XCTAssertEqual(store.items.first?.text, "captured by the app",
+                       "stale until refreshed")
+
+        store.refresh()
+        XCTAssertEqual(store.items.map(\.text), ["added by cli", "captured by the app"])
+    }
+
     func testTrimsAndDedupesWhitespaceVariants() {
         store.push(text: "hello", app: telegram)
         store.push(text: "hello \n", app: telegram)

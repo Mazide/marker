@@ -14,6 +14,18 @@ struct SettingsView: View {
 private struct GeneralSettingsView: View {
     private var model = AppModel.shared
     @State private var autoUpdates = AppModel.shared.autoUpdatesEnabled
+    @State private var cliStatus = CLIInstaller.Status.missing
+
+    private var cliCaption: String {
+        switch cliStatus {
+        case .installed:
+            return "marker is installed — pipe away: marker latest | pbcopy"
+        case .missing:
+            return "Symlinks the bundled marker-cli to /usr/local/bin/marker."
+        case .foreign:
+            return "/usr/local/bin/marker exists and isn't Marker's — Replace overwrites it."
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -116,6 +128,30 @@ private struct GeneralSettingsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
+
+            Section("Command Line") {
+                LabeledContent {
+                    Button(cliStatus == .missing ? "Install" : cliStatus == .foreign ? "Replace…" : "Reinstall") {
+                        CLIInstaller.install()
+                        cliStatus = CLIInstaller.status()
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("Terminal command")
+                            if cliStatus == .installed {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        Text(cliCaption)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .onAppear { cliStatus = CLIInstaller.status() }
             }
 
             Section("Interface") {

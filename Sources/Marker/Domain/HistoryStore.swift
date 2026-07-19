@@ -111,6 +111,16 @@ final class HistoryStore {
         canLoadMore = db.count() > items.count
     }
 
+    /// Re-read the loaded window from the database. External writers
+    /// (marker-cli add, a second instance) insert rows behind the app's
+    /// back; call this before showing or pasting "the latest" so their
+    /// entries count.
+    func refresh() {
+        let limit = max(items.count, pageSize)
+        items = db.recent(limit: limit, offset: 0)
+        canLoadMore = db.count() > items.count
+    }
+
     /// Append the next page of older entries to the in-memory window.
     func loadMore() {
         guard canLoadMore else { return }
