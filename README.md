@@ -2,10 +2,13 @@
 
 # Marker
 
+https://github.com/user-attachments/assets/63c01f3e-4b8c-4b4c-967c-eebe69269451
+
 Linux-style primary selection for macOS. Select text in any app — it is
 captured into Marker's history, a separate buffer that never touches
 your clipboard. Paste the latest selection with ⌥V or middle-click, or
 copy any entry to the clipboard explicitly from the popover.
+
 
 ## Features
 
