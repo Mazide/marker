@@ -1,0 +1,697 @@
+/*
+ * Marker native design, transcribed to CSS.
+ * Sources of truth:
+ *   HistoryView.swift   — popover, rows, empty states, footer
+ *   ToastPresenter.swift — HUD toasts
+ * SwiftUI pt ≈ CSS px here. macOS text styles:
+ *   body 13 · callout 12 · subheadline 11 · footnote 10 · caption 10 · caption2 10
+ */
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Appearance tokens ---------- */
+
+.desktop[data-theme='light'] {
+  /* HistoryView.accent = Color(red .91, green .46, blue .05) */
+  --accent: #e8750d;
+  --accent-selection: rgba(232, 117, 13, 0.22); /* row selected fill */
+  --accent-soft: rgba(232, 117, 13, 0.14);      /* empty-state icon circle */
+
+  --label: rgba(0, 0, 0, 0.85);          /* .primary */
+  --secondary-label: rgba(0, 0, 0, 0.5); /* .secondary */
+  --tertiary-label: rgba(0, 0, 0, 0.26); /* .tertiary */
+  --quaternary-fill: rgba(0, 0, 0, 0.08);       /* .quaternary (row hover) */
+  --quaternary-fill-half: rgba(0, 0, 0, 0.045); /* .quaternary.opacity(0.5) (search bg) */
+  --separator: rgba(0, 0, 0, 0.12);
+
+  /* .regularMaterial approximations */
+  --popover-material: rgba(246, 246, 246, 0.86);
+  --section-material: rgba(246, 246, 246, 0.92);
+  --menu-material: rgba(243, 243, 243, 0.88);
+  --toast-material: rgba(246, 246, 246, 0.82);
+
+  --menu-highlight: #0a6ff2; /* system menu selection blue */
+  --destructive: #e5342c;
+  --warning: #f5a623;
+
+  --desktop-bg: linear-gradient(160deg, #d8a35c 0%, #b9744f 34%, #7e5a76 68%, #3e4d78 100%);
+}
+
+.desktop[data-theme='dark'] {
+  --accent: #ec7f1d;
+  --accent-selection: rgba(236, 127, 29, 0.28);
+  --accent-soft: rgba(236, 127, 29, 0.18);
+
+  --label: rgba(255, 255, 255, 0.85);
+  --secondary-label: rgba(255, 255, 255, 0.55);
+  --tertiary-label: rgba(255, 255, 255, 0.26);
+  --quaternary-fill: rgba(255, 255, 255, 0.1);
+  --quaternary-fill-half: rgba(255, 255, 255, 0.055);
+  --separator: rgba(255, 255, 255, 0.14);
+
+  --popover-material: rgba(44, 44, 46, 0.84);
+  --section-material: rgba(44, 44, 46, 0.92);
+  --menu-material: rgba(50, 50, 52, 0.88);
+  --toast-material: rgba(44, 44, 46, 0.8);
+
+  --menu-highlight: #2e70f5;
+  --destructive: #ff5f57;
+  --warning: #f7b731;
+
+  --desktop-bg: linear-gradient(160deg, #4a3350 0%, #33304f 40%, #1e2b47 75%, #131c30 100%);
+}
+
+/* ---------- Fake desktop stage ---------- */
+
+.desktop {
+  min-height: 100vh;
+  padding: 48px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  align-items: flex-start;
+  background: var(--desktop-bg);
+  color: var(--label);
+}
+
+.desktop.with-menubar {
+  padding-top: 40px;
+  position: relative;
+}
+
+.menubar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--popover-material) 80%, transparent);
+  backdrop-filter: blur(30px) saturate(180%);
+  font-size: 13px;
+}
+
+.menubar .status-icon {
+  width: 28px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.menubar .status-icon.active {
+  background: var(--quaternary-fill);
+}
+
+/* ---------- Popover shell ---------- */
+
+.popover {
+  width: 360px;
+  border-radius: 12px;
+  background: var(--popover-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px var(--separator),
+    0 10px 34px rgba(0, 0, 0, 0.32),
+    0 2px 8px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---------- Header: search + filter ---------- */
+
+.popover-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+
+.search-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--quaternary-fill-half);
+}
+
+.search-field .icon {
+  color: var(--secondary-label);
+  flex: none;
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px; /* .body */
+  color: var(--label);
+  caret-color: var(--accent);
+}
+
+.search-field input::placeholder {
+  color: var(--tertiary-label);
+}
+
+.search-clear {
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  color: var(--secondary-label);
+  cursor: default;
+}
+
+.filter-button {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  display: flex;
+  color: var(--secondary-label);
+  cursor: default;
+}
+
+.filter-button.active {
+  color: var(--accent);
+}
+
+/* ---------- List ---------- */
+
+.history-list {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-bottom: 6px;
+}
+
+.day-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px 14px;
+  font-size: 11px; /* .subheadline */
+  font-weight: 600;
+  color: var(--secondary-label);
+  background: var(--section-material);
+  backdrop-filter: blur(30px);
+}
+
+/* ---------- Row ---------- */
+
+.history-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 6px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.history-row:hover {
+  background: var(--quaternary-fill);
+}
+
+.history-row.selected,
+.history-row.selected:hover {
+  background: var(--accent-selection);
+}
+
+.history-row .app-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px; /* centered on the first prose line box */
+}
+
+.history-row.code .app-icon {
+  height: 16px;
+}
+
+.history-row .snippet {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px; /* .callout */
+  line-height: 18px;
+  color: var(--label);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  white-space: pre-line;
+}
+
+.history-row.code .snippet {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px; /* .footnote monospaced */
+  line-height: 16px;
+}
+
+/* Trailing slot: timestamp at rest, actions on hover — same footprint. */
+.history-row .trailing {
+  flex: none;
+  position: relative;
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.history-row.code .trailing {
+  height: 16px;
+}
+
+.history-row .time {
+  font-size: 10px; /* .caption */
+  font-variant-numeric: tabular-nums;
+  color: var(--tertiary-label);
+  transition: opacity 0.12s ease-out;
+}
+
+.history-row .actions {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out;
+}
+
+.history-row:hover .time { opacity: 0; }
+.history-row:hover .actions { opacity: 1; pointer-events: auto; }
+
+.history-row .actions button {
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  color: var(--secondary-label);
+  cursor: default;
+}
+
+/* ---------- Empty state ---------- */
+
+.empty-state {
+  min-height: 170px;
+  padding: 14px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.empty-state .badge {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 2px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.empty-state .title {
+  font-size: 13px; /* .headline */
+  font-weight: 600;
+}
+
+.empty-state .message {
+  max-width: 250px;
+  font-size: 10px; /* .caption */
+  line-height: 1.4;
+  color: var(--secondary-label);
+}
+
+.empty-state .action {
+  margin-top: 6px;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  color: #fff;
+  background: var(--accent);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.3), 0 0.5px 1px rgba(0, 0, 0, 0.2);
+  cursor: default;
+}
+
+/* ---------- Footer ---------- */
+
+.popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 4px 12px;
+  border-top: 0.5px solid var(--separator);
+}
+
+.popover-footer .hint {
+  font-size: 10px; /* .caption */
+  color: var(--tertiary-label);
+}
+
+.gear-button {
+  width: 28px;
+  height: 24px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-label);
+  cursor: default;
+}
+
+.gear-button:hover {
+  background: var(--quaternary-fill);
+}
+
+/* ---------- Menus (gear, filter, context) ---------- */
+
+.menu {
+  min-width: 200px;
+  padding: 5px;
+  border-radius: 8px;
+  background: var(--menu-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px var(--separator),
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    0 1px 4px rgba(0, 0, 0, 0.15);
+  font-size: 13px;
+  user-select: none;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--label);
+  cursor: default;
+}
+
+.menu-item:hover {
+  background: var(--menu-highlight);
+  color: #fff;
+}
+
+.menu-item:hover .shortcut,
+.menu-item:hover .check {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.menu-item.destructive {
+  color: var(--destructive);
+}
+
+.menu-item.destructive:hover {
+  color: #fff;
+}
+
+.menu-item .label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.menu-item .shortcut {
+  color: var(--tertiary-label);
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+/* Leading checkmark column (filter menu) */
+.menu-item .check {
+  width: 14px;
+  flex: none;
+  color: var(--label);
+  text-align: center;
+}
+
+.menu-item .app-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 5px 10px;
+  background: var(--separator);
+}
+
+/* ---------- Toasts ---------- */
+
+.toast {
+  width: 330px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px var(--separator),
+    0 6px 20px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  user-select: none;
+}
+
+.toast-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px; /* .caption2 */
+  color: var(--secondary-label);
+}
+
+.toast-header .app-name {
+  font-weight: 600;
+  color: var(--label);
+}
+
+.toast-header .app-icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-header .source-icon {
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-body {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--label);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.toast-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--warning);
+}
+
+/* ---------- Shared bits ---------- */
+
+.app-icon-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22%;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.icon svg {
+  display: block;
+  fill: currentColor;
+}
+
+/* ==========================================================================
+   V2 experiments — not in the native app yet
+   ========================================================================== */
+
+/* ---------- Calm rows: one line, one optical size, muted chrome ---------- */
+
+.popover.calm .history-row,
+.panel .history-row {
+  margin: 1px 6px;
+  padding: 6px 8px;
+}
+
+.popover.calm .history-row .snippet,
+.panel .history-row .snippet {
+  display: block;
+  -webkit-line-clamp: unset;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+/* Mono at 11px sits on the same 18px line box → every row same height,
+   no size jump scanning down the list. */
+.popover.calm .history-row.code .snippet,
+.panel .history-row.code .snippet {
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.popover.calm .history-row .app-icon,
+.panel .history-row .app-icon {
+  height: 18px;
+}
+
+/* Colorful app icons recede; content stays loudest. */
+.popover.calm .app-icon-glyph,
+.panel .history-list .app-icon-glyph {
+  filter: saturate(0.72);
+  opacity: 0.88;
+}
+
+/* Timestamp only when the pointer is in the list — at rest the right
+   edge is clean. */
+.popover.calm .history-row .time,
+.panel .history-row .time {
+  opacity: 0;
+}
+
+.popover.calm .history-list:hover .history-row .time,
+.panel .history-list:hover .history-row .time {
+  opacity: 1;
+}
+
+.popover.calm .history-row:hover .time,
+.panel .history-row:hover .time {
+  opacity: 0;
+}
+
+/* Day headers: quieter — small caps instead of a bold band. */
+.popover.calm .day-header,
+.panel .day-header {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tertiary-label);
+  background: none;
+  backdrop-filter: none;
+  padding: 8px 14px 3px;
+  position: static;
+}
+
+/* ---------- Spotlight-style centered panel (hotkey invocation) ---------- */
+
+.desktop.centered {
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 11vh;
+}
+
+.panel {
+  width: 560px;
+  border-radius: 16px;
+  background: var(--popover-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px var(--separator),
+    0 18px 60px rgba(0, 0, 0, 0.38),
+    0 4px 14px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Big search row, Spotlight-style: the field IS the header. */
+.panel .panel-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 48px;
+}
+
+.panel .panel-search .icon {
+  color: var(--secondary-label);
+}
+
+.panel .panel-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 300;
+  color: var(--label);
+  caret-color: var(--accent);
+}
+
+.panel .panel-search input::placeholder {
+  color: var(--tertiary-label);
+}
+
+.panel .panel-search .filter-button {
+  padding: 0;
+}
+
+.panel .history-list {
+  border-top: 0.5px solid var(--separator);
+  max-height: 400px;
+  padding-top: 2px;
+}
