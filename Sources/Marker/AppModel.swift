@@ -202,7 +202,7 @@ final class AppModel {
                 guard let item = self.itemToPaste() else { return }
                 self.pasteEngine.pasteIntoActiveApp(item.content)
             case .showHistory:
-                self.openHistoryPopover()
+                HistoryPanelPresenter.shared.toggle()
             }
         }
         middleClickTap.onMiddleClick = { [weak self] point in
@@ -333,6 +333,23 @@ final class AppModel {
         ToastPresenter.shared.showReady(text: item.text, hotkeyLabel: pasteHotkey.label)
     }
 
+    /// Panel row click / ↩. The panel is non-activating, so the frontmost
+    /// app never lost focus: if an editable element still holds the caret,
+    /// paste straight into it — the text appearing is its own feedback.
+    /// No editable focus → arm the paste slot as before. Either way the
+    /// item stays armed so the paste hotkey can repeat it.
+    func pickFromPanel(_ item: SelectionItem) {
+        let role = axTrusted ? axMonitor.focusedElementRole() : nil
+        guard let role, MiddlePastePolicy.shouldPaste(role: role) else {
+            markerLog.info("panel pick: no editable focus (\(role ?? "nil", privacy: .public)) — armed paste slot")
+            pickForPaste(item)
+            return
+        }
+        markerLog.info("panel pick: pasting into focused \(role, privacy: .public)")
+        pickedPasteItemID = item.id
+        pasteEngine.pasteIntoActiveApp(item.content)
+    }
+
     /// Search query the popover should adopt (marker://search). Cleared by
     /// HistoryView once applied.
     var popoverSearchRequest: String?
@@ -340,10 +357,10 @@ final class AppModel {
     func handle(_ command: URLCommand) {
         switch command {
         case .show:
-            openHistoryPopover()
+            HistoryPanelPresenter.shared.show()
         case .search(let query):
             popoverSearchRequest = query
-            openHistoryPopover()
+            HistoryPanelPresenter.shared.show()
         case .copy(let position):
             history.refresh()
             let items = history.items
@@ -358,23 +375,6 @@ final class AppModel {
                 app: SourceApp(pid: 0, bundleID: "url.marker.add", name: "Automation", isSelf: false)
             )
         }
-    }
-
-    /// SwiftUI's MenuBarExtra has no public API to open its window, so the
-    /// hotkey presses the status item's button the way a click would. The
-    /// KVC key is private ("statusItem" on NSStatusBarWindow) — probed with
-    /// responds(to:) first so an OS change degrades to a log line, not a
-    /// crash.
-    func openHistoryPopover() {
-        guard let window = NSApp.windows.first(where: { $0.className == "NSStatusBarWindow" }),
-              window.responds(to: Selector(("statusItem"))),
-              let item = window.value(forKey: "statusItem") as? NSStatusItem,
-              let button = item.button
-        else {
-            markerLog.error("history hotkey: status item button not reachable")
-            return
-        }
-        button.performClick(nil)
     }
 
     func openAccessibilitySettings() {
