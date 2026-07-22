@@ -19,6 +19,12 @@ final class ToastPresenter {
         present(PasteToastView(text: snippet(of: text), source: source))
     }
 
+    /// A popover pick landed in Marker's paste slot; tell the user how to
+    /// fire it — the popover has already closed by the time this shows.
+    func showReady(text: String, hotkeyLabel: String) {
+        present(ReadyToastView(text: snippet(of: text), hotkeyLabel: hotkeyLabel))
+    }
+
     private func snippet(of text: String) -> String {
         text
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -135,6 +141,36 @@ private struct PasteToastView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 sourceLabel
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Text(text)
+                .font(.system(size: 12.5))
+                .lineLimit(3)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(width: 330, alignment: .leading)
+        .toastBackground()
+        .padding(5)
+    }
+}
+
+private struct ReadyToastView: View {
+    let text: String
+    let hotkeyLabel: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 14, height: 14)
+                Text("Marker")
+                    .font(.caption2.weight(.semibold))
+                Text("· \(hotkeyLabel) pastes this")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

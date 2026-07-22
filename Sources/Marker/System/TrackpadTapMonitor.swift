@@ -20,6 +20,7 @@ final class TrackpadTapMonitor {
         UnsafeMutableRawPointer?, MTContactCallback?
     ) -> Void
     private typealias MTDeviceStart = @convention(c) (UnsafeMutableRawPointer?, Int32) -> Void
+    private typealias MTDeviceStop = @convention(c) (UnsafeMutableRawPointer?) -> Void
 
     // The C callback has no refcon; a single shared instance receives frames.
     nonisolated(unsafe) static var shared: TrackpadTapMonitor?
@@ -43,6 +44,11 @@ final class TrackpadTapMonitor {
         return fingersDown
     }
 
+    private var createList: MTDeviceCreateList?
+    private var register: MTRegisterContactFrameCallback?
+    private var deviceStart: MTDeviceStart?
+    private var deviceStop: MTDeviceStop?
+
     func start() {
         guard !started else { return }
         started = true
@@ -60,10 +66,35 @@ final class TrackpadTapMonitor {
             return
         }
 
-        let createList = unsafeBitCast(createListSym, to: MTDeviceCreateList.self)
-        let register = unsafeBitCast(registerSym, to: MTRegisterContactFrameCallback.self)
-        let deviceStart = unsafeBitCast(startSym, to: MTDeviceStart.self)
+        createList = unsafeBitCast(createListSym, to: MTDeviceCreateList.self)
+        register = unsafeBitCast(registerSym, to: MTRegisterContactFrameCallback.self)
+        deviceStart = unsafeBitCast(startSym, to: MTDeviceStart.self)
+        // Optional: absent symbol just means restart() re-registers without
+        // stopping the old devices first.
+        if let stopSym = dlsym(handle, "MTDeviceStop") {
+            deviceStop = unsafeBitCast(stopSym, to: MTDeviceStop.self)
+        }
 
+        attach()
+    }
+
+    /// Re-register the frame callback on a fresh device list. The
+    /// MultitouchSupport feed dies silently across sleep/wake (observed
+    /// 2026-07-17 and 2026-07-21); stale device refs never fire again, so
+    /// stop them and start over.
+    func restart() {
+        guard started, createList != nil else { return }
+        if let devices, let deviceStop {
+            for index in 0..<CFArrayGetCount(devices) {
+                deviceStop(UnsafeMutableRawPointer(mutating: CFArrayGetValueAtIndex(devices, index)))
+            }
+        }
+        devices = nil
+        attach()
+    }
+
+    private func attach() {
+        guard let createList, let register, let deviceStart else { return }
         guard let list = createList()?.takeRetainedValue() else {
             markerLog.error("MTDeviceCreateList returned nothing")
             return

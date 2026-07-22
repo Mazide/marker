@@ -39,6 +39,37 @@ final class MiddlePastePolicyTests: XCTestCase {
             cursorRole: "AXWebArea", focusedRole: { "AXTextField" }))
     }
 
+    func testTapFallsBackOverRichTextContent() {
+        // Contenteditable editors (ChatGPT, Slack, Notion) hit-test as
+        // AXGroup/AXStaticText while focusing a real editable element. A tap
+        // consumes nothing, so it may claim them.
+        XCTAssertTrue(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXGroup", focusedRole: { "AXTextArea" },
+            allowContentRoleFallback: true))
+        XCTAssertTrue(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXStaticText", focusedRole: { "AXTextField" },
+            allowContentRoleFallback: true))
+    }
+
+    func testTapFallbackStillNeedsAnEditableFocus() {
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXGroup", focusedRole: { "AXWebArea" },
+            allowContentRoleFallback: true))
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXGroup", focusedRole: { nil },
+            allowContentRoleFallback: true))
+    }
+
+    func testTapFallbackDoesNotReachClickableRoles() {
+        // Even for a tap, a link or button is a real control — not content.
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXLink", focusedRole: { "AXTextField" },
+            allowContentRoleFallback: true))
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXButton", focusedRole: { "AXTextField" },
+            allowContentRoleFallback: true))
+    }
+
     func testCursorRoleWinsWithoutTouchingFocus() {
         XCTAssertTrue(MiddlePastePolicy.shouldPaste(
             cursorRole: "AXTextField",

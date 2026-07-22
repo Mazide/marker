@@ -17,6 +17,7 @@ final class ThreeFingerClickTap {
     var onThreeFingerClick: (() -> Bool)?
 
     private var tap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
     private var swallowNextUp = false
 
     func start() {
@@ -41,8 +42,32 @@ final class ThreeFingerClickTap {
             return
         }
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    /// The tap exists but the system has switched it off — the silent
+    /// death mode. A tap that was never created doesn't count as dead.
+    var isDead: Bool {
+        guard let tap else { return false }
+        return !CGEvent.tapIsEnabled(tap: tap)
+    }
+
+    /// Tear down and recreate the tap. Taps die silently across sleep/wake —
+    /// the disabled-by-timeout callback only arrives while the tap still
+    /// delivers events, so recreation is the only reliable revival.
+    func restart() {
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        }
+        tap = nil
+        runLoopSource = nil
+        start()
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {

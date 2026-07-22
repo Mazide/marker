@@ -8,7 +8,7 @@ struct HistoryView: View {
     @State private var filterBundleID: String?
     @FocusState private var searchFocused: Bool
     /// Keyboard selection, Spotlight-style: the first row is preselected,
-    /// arrows move it, Return copies it — all while search keeps focus.
+    /// arrows move it, Return pastes it — all while search keeps focus.
     @State private var selectedID: UUID?
 
     private func openSettings() {
@@ -39,7 +39,7 @@ struct HistoryView: View {
         .onChange(of: filterBundleID) { _, _ in selectedID = filteredItems.first?.id }
         .onKeyPress(.downArrow) { moveSelection(by: 1) }
         .onKeyPress(.upArrow) { moveSelection(by: -1) }
-        .onKeyPress(.return) { copySelected() }
+        .onKeyPress(.return) { pickSelected() }
         .onKeyPress(.escape) {
             // Standard search-field staging: first Esc clears the query,
             // the next one closes the popover.
@@ -65,11 +65,11 @@ struct HistoryView: View {
         return .handled
     }
 
-    private func copySelected() -> KeyPress.Result {
+    private func pickSelected() -> KeyPress.Result {
         guard let item = filteredItems.first(where: { $0.id == selectedID }) ?? filteredItems.first
         else { return .ignored }
-        model.copyToClipboard(item)
         dismiss()
+        model.pickForPaste(item)
         return .handled
     }
 
@@ -201,6 +201,10 @@ struct HistoryView: View {
                                 HistoryRow(
                                     item: item,
                                     isSelected: item.id == selectedID,
+                                    onPick: {
+                                        dismiss()
+                                        model.pickForPaste(item)
+                                    },
                                     onCopy: {
                                         model.copyToClipboard(item)
                                         dismiss()
@@ -243,7 +247,7 @@ struct HistoryView: View {
 
     private var footer: some View {
         HStack {
-            Text("↩ copies · \(model.pasteHotkey.label) pastes latest")
+            Text("↩ picks · \(model.pasteHotkey.label) pastes it · right-click copies")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -326,6 +330,7 @@ private struct EmptyState: View {
 private struct HistoryRow: View {
     let item: SelectionItem
     let isSelected: Bool
+    let onPick: () -> Void
     let onCopy: () -> Void
     let onDelete: () -> Void
 
@@ -374,7 +379,7 @@ private struct HistoryRow: View {
     }
 
     var body: some View {
-        Button(action: onCopy) {
+        Button(action: onPick) {
             HStack(alignment: .top, spacing: 8) {
                 // The icon *is* the source label — hence no app-name caption.
                 // It is centered on the snippet's first line: baseline
@@ -460,6 +465,6 @@ private struct HistoryRow: View {
         // The app name is gone from the visuals, so keep it in the label.
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(snippet), \(item.appName)")
-        .accessibilityHint("Copies this selection")
+        .accessibilityHint("Makes this what the paste hotkey inserts")
     }
 }

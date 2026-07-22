@@ -20,16 +20,31 @@ enum MiddlePastePolicy {
     /// that doesn't describe its content, not a real UI element.
     private static let bareRoles: Set<String?> = ["AXWindow", nil]
 
+    /// Content roles: rich-text editors (contenteditable in Chrome, Slack,
+    /// Notion) hit-test as AXGroup or AXStaticText while focusing a real
+    /// editable element. Falling back here is only safe for triggers that
+    /// consume nothing — over a browser page a click still belongs to the
+    /// app, so middle-click and three-finger click must keep passing through.
+    private static let contentRoles: Set<String?> = ["AXGroup", "AXStaticText"]
+
     static func shouldPaste(role: String?) -> Bool {
         guard let role else { return false }
         return textRoles.contains(role)
     }
 
-    /// Full decision for both input paths: cursor role first, focused
+    /// Full decision for every input path: cursor role first, focused
     /// element as fallback only when the cursor hit nothing meaningful.
-    static func shouldPaste(cursorRole: String?, focusedRole: () -> String?) -> Bool {
+    /// `allowContentRoleFallback` widens that fallback to rich-text editor
+    /// content; pass it only for triggers that don't swallow a click.
+    static func shouldPaste(
+        cursorRole: String?,
+        focusedRole: () -> String?,
+        allowContentRoleFallback: Bool = false
+    ) -> Bool {
         if shouldPaste(role: cursorRole) { return true }
-        guard bareRoles.contains(cursorRole) else { return false }
+        let canFallBack = bareRoles.contains(cursorRole)
+            || (allowContentRoleFallback && contentRoles.contains(cursorRole))
+        guard canFallBack else { return false }
         return shouldPaste(role: focusedRole())
     }
 }

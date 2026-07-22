@@ -152,6 +152,7 @@ final class AppModel {
     )
     @ObservationIgnored private var trustPollTimer: Timer?
     @ObservationIgnored private var retentionTimer: Timer?
+    @ObservationIgnored private var tapHealthTimer: Timer?
 
     // Domain layer
     @ObservationIgnored private var engine: CaptureEngine!
@@ -229,7 +230,7 @@ final class AppModel {
         }
         trackpadTap.onThreeFingerDoubleTap = { [weak self] in
             guard let self, self.threeFingerPasteMode == .doubleTap, self.axTrusted,
-                  self.shouldPasteAtCursor(input: "three-finger double tap"),
+                  self.shouldPasteAtCursor(input: "three-finger double tap", isTap: true),
                   let item = self.itemToPaste()
             else { return }
             self.pasteEngine.pasteIntoActiveApp(item.content)
@@ -256,6 +257,32 @@ final class AppModel {
            Bundle.main.bundlePath.hasPrefix("/Applications/") {
             UserDefaults.standard.set(true, forKey: offeredKey)
             launchAtLogin = true
+        }
+
+        // Every input feed can die silently across sleep/wake: CGEventTaps
+        // stop delivering (their disabled-by-timeout callback never fires on
+        // a dead tap), and the MultitouchSupport frame stream goes quiet
+        // (observed 2026-07-17, and 2026-07-21 after a day-long lid close —
+        // capture and click-paste both dead until relaunch). Recreate all of
+        // them on every wake.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in AppModel.shared.restartInputMonitors() }
+        }
+        // Belt to the wake fix's suspenders: taps have also died with no
+        // sleep involved (2026-07-17, trigger never confirmed). A dead tap
+        // reports tapIsEnabled == false at least in the timeout-disable
+        // mode, so a cheap poll catches part of what the wake hook misses.
+        tapHealthTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
+            Task { @MainActor in
+                let model = AppModel.shared
+                guard model.axTrusted,
+                      model.middleClickTap.isDead || model.threeFingerClickTap.isDead
+                else { return }
+                markerLog.error("health check: dead event tap detected")
+                model.restartInputMonitors()
+            }
         }
 
         markerLog.info("start: AX trusted = \(self.axTrusted)")
@@ -292,6 +319,18 @@ final class AppModel {
 
     func copyToClipboard(_ item: SelectionItem) {
         pasteboard.writeContent(item.content)
+    }
+
+    /// The entry the paste triggers use when the user picked one in the
+    /// popover — Marker's own paste slot, nothing near the system clipboard.
+    /// A new capture clears it: the fresh selection takes over again.
+    @ObservationIgnored private var pickedPasteItemID: UUID?
+
+    /// Popover row click / ↩: make this item what ⌥V and the click gestures
+    /// paste. The toast is the feedback that the click did something.
+    func pickForPaste(_ item: SelectionItem) {
+        pickedPasteItemID = item.id
+        ToastPresenter.shared.showReady(text: item.text, hotkeyLabel: pasteHotkey.label)
     }
 
     /// Search query the popover should adopt (marker://search). Cleared by
@@ -354,6 +393,9 @@ final class AppModel {
 
         let isNew = history.items.first?.text != content.plain
         let saved = history.push(content, app: app)
+        // Selecting something new supersedes a popover pick — the latest
+        // selection is what the user means to paste now.
+        pickedPasteItemID = nil
         if isNew, toastEnabled {
             ToastPresenter.shared.show(
                 text: content.plain,
@@ -372,6 +414,14 @@ final class AppModel {
     private func itemToPaste() -> SelectionItem? {
         history.refresh() // marker-cli may have added entries behind our back
         let items = history.items
+        // A popover pick wins outright — the user pointed at this exact
+        // entry, so the never-paste-onto-itself policy doesn't apply.
+        if let id = pickedPasteItemID {
+            if let picked = items.first(where: { $0.id == id }) {
+                return picked
+            }
+            pickedPasteItemID = nil // deleted since; fall back to the newest
+        }
         let picked = PastePolicy.item(
             history: items,
             currentSelection: axMonitor.currentSelection()
@@ -383,18 +433,36 @@ final class AppModel {
         return picked
     }
 
-    /// Shared gate for middle-click and three-finger click; both paste into
-    /// the focused element, so both use the same cursor/focus policy.
-    private func shouldPasteAtCursor(input: String) -> Bool {
+    /// Shared gate for the cursor-targeted triggers; they all paste into the
+    /// focused element, so they share one cursor/focus policy. Clicks pass
+    /// through when the policy says no, so they may not claim rich-text
+    /// content roles — a tap consumes nothing and can.
+    private func shouldPasteAtCursor(input: String, isTap: Bool = false) -> Bool {
         let cursorRole = axMonitor.roleAtMouseLocation()
         guard MiddlePastePolicy.shouldPaste(
             cursorRole: cursorRole,
-            focusedRole: { self.axMonitor.focusedElementRole() }
+            focusedRole: { self.axMonitor.focusedElementRole() },
+            allowContentRoleFallback: isTap
         ) else {
-            markerLog.info("\(input, privacy: .public) ignored: cursor=\(cursorRole ?? "nil", privacy: .public)")
+            let focused = axMonitor.focusedElementRole() ?? "nil"
+            markerLog.info("\(input, privacy: .public) ignored: cursor=\(cursorRole ?? "nil", privacy: .public) focused=\(focused, privacy: .public)")
             return false
         }
         return true
+    }
+
+    /// Recreate the input monitors after a wake. Safe to run even if they
+    /// are healthy — stop/recreate is cheap and loses no state.
+    private func restartInputMonitors() {
+        guard axTrusted else { return }
+        markerLog.info("wake: restarting input monitors")
+        mouseMonitor.stop()
+        mouseMonitor.start()
+        middleClickTap.restart()
+        threeFingerClickTap.restart()
+        if threeFingerPasteMode != .off {
+            trackpadTap.restart()
+        }
     }
 
     private func promptForAccessibilityIfNeeded() {
