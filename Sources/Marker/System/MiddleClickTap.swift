@@ -65,10 +65,15 @@ final class MiddleClickTap {
 
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            diagLog("middle-click tap disabled (\(type.rawValue)), re-enabling")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
-        guard event.getIntegerValueField(.mouseEventButtonNumber) == 2 else {
+        let button = event.getIntegerValueField(.mouseEventButtonNumber)
+        if type == .otherMouseDown {
+            diagLog("otherMouseDown button=\(button)")
+        }
+        guard button == 2 else {
             return Unmanaged.passUnretained(event)
         }
         switch type {

@@ -80,6 +80,16 @@ final class AppModel {
         didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
     }
 
+    /// File trail for the click-paste path (~/Library/Logs/Marker.log), so
+    /// a "middle-click didn't paste" report can be diagnosed by copying one
+    /// file. Off by default.
+    var diagLogEnabled: Bool = UserDefaults.standard.bool(forKey: "diagLogEnabled") {
+        didSet {
+            UserDefaults.standard.set(diagLogEnabled, forKey: "diagLogEnabled")
+            DiagFile.shared.enabled = diagLogEnabled
+        }
+    }
+
     /// Trackpad three-finger paste as a middle-click substitute, via the
     /// private MultitouchSupport API — experimental, off by default. Click
     /// is the deliberate, false-positive-proof trigger; double tap is the
@@ -206,13 +216,20 @@ final class AppModel {
             }
         }
         middleClickTap.onMiddleClick = { [weak self] point in
-            guard let self, self.middleClickPasteEnabled, self.axTrusted,
-                  self.shouldPasteAtCursor(input: "middle-click"),
-                  let item = self.itemToPaste()
-            else { return false }
+            guard let self else { return false }
+            guard self.middleClickPasteEnabled, self.axTrusted else {
+                diagLog("middle-click ignored: enabled=\(self.middleClickPasteEnabled) axTrusted=\(self.axTrusted)")
+                return false
+            }
+            guard self.shouldPasteAtCursor(input: "middle-click") else { return false }
+            guard let item = self.itemToPaste() else {
+                diagLog("middle-click ignored: nothing to paste (PastePolicy)")
+                return false
+            }
             _ = point
             // Paste into the current focus, same as ⌥V.
             self.pasteEngine.pasteIntoActiveApp(item.content)
+            diagLog("middle-click pasted \(item.text.count) chars")
             ToastPresenter.shared.showPaste(text: item.text, source: .middleClick)
             return true
         }
@@ -280,12 +297,12 @@ final class AppModel {
                 guard model.axTrusted,
                       model.middleClickTap.isDead || model.threeFingerClickTap.isDead
                 else { return }
-                markerLog.error("health check: dead event tap detected")
+                diagLog("health check: dead event tap detected")
                 model.restartInputMonitors()
             }
         }
 
-        markerLog.info("start: AX trusted = \(self.axTrusted)")
+        diagLog("start: AX trusted = \(axTrusted)")
         promptForAccessibilityIfNeeded()
         if axTrusted {
             axMonitor.start()
@@ -445,7 +462,7 @@ final class AppModel {
             allowContentRoleFallback: isTap
         ) else {
             let focused = axMonitor.focusedElementRole() ?? "nil"
-            markerLog.info("\(input, privacy: .public) ignored: cursor=\(cursorRole ?? "nil", privacy: .public) focused=\(focused, privacy: .public)")
+            diagLog("\(input) ignored: cursor=\(cursorRole ?? "nil") focused=\(focused)")
             return false
         }
         return true
@@ -455,7 +472,7 @@ final class AppModel {
     /// are healthy — stop/recreate is cheap and loses no state.
     private func restartInputMonitors() {
         guard axTrusted else { return }
-        markerLog.info("wake: restarting input monitors")
+        diagLog("wake: restarting input monitors")
         mouseMonitor.stop()
         mouseMonitor.start()
         middleClickTap.restart()

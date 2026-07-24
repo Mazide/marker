@@ -159,6 +159,14 @@ private struct GeneralSettingsView: View {
                 Toggle("Start at login", isOn: Bindable(model).launchAtLogin)
             }
 
+            Section("Troubleshooting") {
+                SettingToggle(
+                    "Log paste diagnostics to a file",
+                    caption: "Records why each middle-click did or didn't paste in ~/Library/Logs/Marker.log. No clipboard content is written.",
+                    isOn: Bindable(model).diagLogEnabled
+                )
+            }
+
             Section("History") {
                 Picker("Keep history for", selection: Bindable(model).historyRetentionDays) {
                     Text("Forever").tag(0)
