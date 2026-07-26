@@ -20,7 +20,9 @@
 "Physical click" = "Physical click";
 "Double tap" = "Double tap";
 "Interface" = "Interface";
+"Appearance" = "Appearance";
 "Show a popup on capture" = "Show a popup on capture";
+"Offers Copy beside the pointer without changing the clipboard automatically." = "Offers Copy beside the pointer without changing the clipboard automatically.";
 "Start at login" = "Start at login";
 "History" = "History";
 "Remove every captured selection" = "Remove every captured selection";
@@ -44,6 +46,12 @@
 "Nothing selected like that. Try fewer letters or another app filter." = "Nothing selected like that. Try fewer letters or another app filter.";
 "⌥V pastes latest" = "⌥V pastes latest";
 "Copy" = "Copy";
+"Copied" = "Copied";
+"Saved" = "Saved";
+"Saved to Marker" = "Saved to Marker";
+"Copy to Clipboard" = "Copy to Clipboard";
+"Copied to Clipboard" = "Copied to Clipboard";
+"Pasted with Marker" = "Pasted with Marker";
 "Delete" = "Delete";
 "Copies this selection" = "Copies this selection";
 

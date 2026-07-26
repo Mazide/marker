@@ -33,6 +33,7 @@ final class HistoryPanelPresenter: NSObject, NSWindowDelegate {
         // and onAppear refreshes history and grabs keyboard focus.
         let hosting = NSHostingController(
             rootView: HistoryView(onDismiss: { [weak self] in self?.close() })
+                .markerThemed()
         )
         panel.contentViewController = hosting
 

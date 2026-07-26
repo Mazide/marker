@@ -7,7 +7,8 @@ https://github.com/user-attachments/assets/63c01f3e-4b8c-4b4c-967c-eebe69269451
 Linux-style primary selection for macOS. Select text in any app — it is
 captured into Marker's history, a separate buffer that never touches
 your clipboard. Paste the latest selection with ⌥V or middle-click, or
-copy any entry to the clipboard explicitly from the popover.
+copy it to the clipboard explicitly from the action beside the pointer
+or from history.
 
 
 ## Features
@@ -17,7 +18,7 @@ copy any entry to the clipboard explicitly from the popover.
   RTF/HTML flavors alongside plain text, so ⌥V and history copies
   paste rich into targets that accept it.
 - Strict separate-buffer mode: the system clipboard is never written
-  on capture, only on an explicit copy from the popover.
+  on capture, only when you click Copy beside the selection or in history.
 - Fallback capture for apps that hide selections from Accessibility
   (Telegram, kitty, …): synthesized Cmd+C or detection of the app's own
   copy-on-select, with the previous clipboard restored afterwards.
@@ -27,7 +28,9 @@ copy any entry to the clipboard explicitly from the popover.
 - **⌥V** pastes the most recent selection into the active app. The system
   clipboard is briefly swapped and then restored.
 - **⇧⌥V** opens the history popover from anywhere.
-- Menu bar popover: click any history entry to copy it to the clipboard.
+- A transient Copy action beside each mouse selection promotes it to the
+  system clipboard without taking focus from the source app.
+- Menu bar popover: copy any history entry to the clipboard.
 - Secrets (API keys, tokens, private keys) are never written to history.
 - Ignored apps (Settings → Ignored apps): selections in the listed apps
   are never captured — no history entry, and the ⌘C fallback never fires

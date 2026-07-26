@@ -20,7 +20,9 @@
 "Physical click" = "点按";
 "Double tap" = "轻点两下";
 "Interface" = "界面";
+"Appearance" = "外观";
 "Show a popup on capture" = "捕获时显示弹窗";
+"Offers Copy beside the pointer without changing the clipboard automatically." = "在指针旁显示拷贝操作，而不会自动更改剪贴板。";
 "Start at login" = "登录时启动";
 "History" = "历史记录";
 "Remove every captured selection" = "移除所有已捕获的所选内容";
@@ -44,6 +46,12 @@
 "Nothing selected like that. Try fewer letters or another app filter." = "没有这样的所选内容。试试更短的关键词或其他应用过滤。";
 "⌥V pastes latest" = "⌥V 粘贴最新内容";
 "Copy" = "拷贝";
+"Copied" = "已拷贝";
+"Saved" = "已保存";
+"Saved to Marker" = "已保存到 Marker";
+"Copy to Clipboard" = "拷贝到剪贴板";
+"Copied to Clipboard" = "已拷贝到剪贴板";
+"Pasted with Marker" = "已通过 Marker 粘贴";
 "Delete" = "删除";
 "Copies this selection" = "拷贝这条所选内容";
 

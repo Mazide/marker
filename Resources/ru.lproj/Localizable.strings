@@ -20,7 +20,9 @@
 "Physical click" = "Физический клик";
 "Double tap" = "Двойной тап";
 "Interface" = "Интерфейс";
+"Appearance" = "Оформление";
 "Show a popup on capture" = "Показывать уведомление при захвате";
+"Offers Copy beside the pointer without changing the clipboard automatically." = "Предлагает скопировать выделенное рядом с указателем, не меняя буфер обмена автоматически.";
 "Start at login" = "Запускать при входе в систему";
 "History" = "История";
 "Remove every captured selection" = "Удалить всё сохранённое";
@@ -44,6 +46,12 @@
 "Nothing selected like that. Try fewer letters or another app filter." = "Такого не выделяли. Попробуйте запрос короче или другой фильтр.";
 "⌥V pastes latest" = "⌥V — вставить последнее";
 "Copy" = "Скопировать";
+"Copied" = "Скопировано";
+"Saved" = "Сохранено";
+"Saved to Marker" = "Сохранено в Marker";
+"Copy to Clipboard" = "В буфер обмена";
+"Copied to Clipboard" = "Скопировано в буфер";
+"Pasted with Marker" = "Вставлено через Marker";
 "Delete" = "Удалить";
 "Copies this selection" = "Копирует это выделение";
 

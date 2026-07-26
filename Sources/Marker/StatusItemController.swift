@@ -25,7 +25,7 @@ final class StatusItemController {
     /// Mono glyph of the app icon (highlight stripe + I-beam), drawn in
     /// code for a clean alpha channel. Template image so the menu bar
     /// tints it for light/dark and inactive states.
-    private static let icon: NSImage = {
+    static let icon: NSImage = {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: true) { _ in
             guard let cg = NSGraphicsContext.current?.cgContext else { return false }

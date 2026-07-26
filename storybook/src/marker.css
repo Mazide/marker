@@ -36,6 +36,8 @@
   --menu-highlight: #0a6ff2; /* system menu selection blue */
   --destructive: #e5342c;
   --warning: #f5a623;
+  --green: #28cd41; /* systemGreen */
+  --material-opaque: #f0f0f0; /* opaque stand-in for icon knockouts */
 
   --desktop-bg: linear-gradient(160deg, #d8a35c 0%, #b9744f 34%, #7e5a76 68%, #3e4d78 100%);
 }
@@ -60,6 +62,8 @@
   --menu-highlight: #2e70f5;
   --destructive: #ff5f57;
   --warning: #f7b731;
+  --green: #32d74b;
+  --material-opaque: #323234;
 
   --desktop-bg: linear-gradient(160deg, #4a3350 0%, #33304f 40%, #1e2b47 75%, #131c30 100%);
 }
@@ -537,6 +541,95 @@
   color: var(--warning);
 }
 
+/* ---------- Selection action pill (SelectionActionPresenter.swift) ---------- */
+
+/* HStack(spacing:9) · minHeight 32 · padding-h 9 · radius 10
+   .regularMaterial + separator@0.45 border + shadow(black .2, r8, y3) */
+.selection-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--separator) 45%, transparent),
+    0 3px 16px rgba(0, 0, 0, 0.2);
+  user-select: none;
+}
+
+.saved-badge {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.saved-badge .check-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+}
+
+.selection-action .divider {
+  width: 1px;
+  height: 16px;
+  flex: none;
+  background: var(--separator);
+}
+
+.selection-action .copy-button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-label);
+  transition: color 0.1s ease-out;
+  cursor: default;
+}
+
+.selection-action .copy-button:hover {
+  color: var(--label);
+}
+
+.selection-action .copied-check {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green);
+  animation: selection-action-in 0.12s ease-out both;
+}
+
+/* Icon-only paste confirmation: 22pt badge, 7pt padding all around. */
+.selection-action.paste-confirmation {
+  min-height: 0;
+  padding: 7px;
+}
+
+/* Native show: alpha 0 → 1, 0.12s ease-out. Dismiss is instant. */
+.selection-action.enter {
+  animation: selection-action-in 0.12s ease-out both;
+}
+
+.selection-action.hidden {
+  visibility: hidden;
+}
+
+@keyframes selection-action-in {
+  from { opacity: 0; }
+}
+
 /* ---------- Shared bits ---------- */
 
 .app-icon-glyph {
@@ -694,4 +787,2142 @@
   border-top: 0.5px solid var(--separator);
   max-height: 400px;
   padding-top: 2px;
+}
+
+/* ==========================================================================
+   V2 variants: selection action
+   Six directions for the capture pill (SelectionActionVariants.stories.js).
+   All motion ≤0.35s, SwiftUI-implementable (opacity/scale/offset/trim).
+   `.force-hover` mirrors :hover for the static comparison board.
+   ========================================================================== */
+
+.desktop {
+  --v2-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* soft overshoot */
+  --v2-ease: cubic-bezier(0.22, 1, 0.36, 1);      /* fast out, gentle settle */
+  --v2-material-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--separator) 45%, transparent),
+    0 3px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- shared: capsule, divider, copy button, check pop ---------- */
+
+.v2-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow: var(--v2-material-shadow);
+  user-select: none;
+}
+
+.v2-divider {
+  width: 1px;
+  height: 16px;
+  flex: none;
+  background: var(--separator);
+}
+
+.v2-copy {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-label);
+  transition: color 0.1s ease-out, background-color 0.15s ease-out;
+  cursor: default;
+}
+
+.v2-copy:hover,
+.force-hover .v2-copy {
+  color: var(--label);
+  background: var(--quaternary-fill);
+}
+
+/* Copied feedback: the check springs in where the button was. */
+.v2-check-pop {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green);
+  animation: v2-pop 0.3s var(--v2-spring) both;
+}
+
+@keyframes v2-pop {
+  from { transform: scale(0.3); opacity: 0; }
+}
+
+@keyframes v2-pop-in {
+  from { transform: scale(0.85); opacity: 0; }
+}
+
+@keyframes v2-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes v2-fade-out {
+  to { opacity: 0; }
+}
+
+/* ---------- V1 Ink dot: proximity bloom ---------- */
+
+.v2-ink {
+  width: 8px;
+  height: 8px;
+}
+
+.v2-ink .ink-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+  animation: v2-ink-drop 0.3s var(--v2-spring) both;
+  transition: transform 0.18s ease-in, opacity 0.18s ease-in;
+}
+
+@keyframes v2-ink-drop {
+  from { transform: scale(0); }
+}
+
+/* The full pill sits collapsed behind the dot until proximity expands it. */
+.v2-ink .v2-pill {
+  position: absolute;
+  left: -8px;
+  top: -12px;
+  opacity: 0;
+  transform: scale(0.5);
+  transform-origin: 12px 16px; /* the dot's center */
+  pointer-events: none;
+  transition: transform 0.28s var(--v2-spring), opacity 0.16s ease-out;
+}
+
+.v2-ink.expand .ink-dot {
+  transform: scale(0);
+  opacity: 0;
+}
+
+.v2-ink.expand .v2-pill {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Copy: the pill collapses back into a popping green check chip. */
+.v2-ink.copied .v2-pill {
+  opacity: 0;
+  transform: scale(0.5);
+  pointer-events: none;
+  transition: transform 0.2s ease-in, opacity 0.15s ease-in;
+}
+
+.v2-ink .ink-done {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transform: scale(0);
+  opacity: 0;
+}
+
+.v2-ink.copied .ink-done {
+  animation: v2-ink-done 0.32s var(--v2-spring) 0.12s both;
+}
+
+@keyframes v2-ink-done {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- V2 Underline shimmer ---------- */
+
+/* Root is sized to the selection's last line box (inline width). */
+.v2-shimmer {
+  height: 28px;
+}
+
+.v2-shimmer .shimmer-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  transform-origin: left center;
+  background: linear-gradient(
+    100deg,
+    var(--accent) 30%,
+    color-mix(in srgb, var(--accent) 40%, #fff) 50%,
+    var(--accent) 70%
+  );
+  background-size: 250% 100%;
+  animation:
+    v2-line-grow 0.28s var(--v2-ease) both,
+    v2-line-shimmer 0.8s ease-in-out 0.25s both;
+}
+
+@keyframes v2-line-grow {
+  from { transform: scaleX(0); }
+}
+
+/* One specular sweep, left to right, then the line settles solid. */
+@keyframes v2-line-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+
+/* Docked tab at the end of the underline — the whole click target. */
+.v2-shimmer .shimmer-tab {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 7px;
+  border: none;
+  border-radius: 0 0 7px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--secondary-label);
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--separator) 45%, transparent),
+    0 3px 10px rgba(0, 0, 0, 0.16);
+  animation: v2-tab-drop 0.3s var(--v2-spring) 0.1s both;
+  transition: color 0.12s ease-out;
+  cursor: default;
+  user-select: none;
+}
+
+@keyframes v2-tab-drop {
+  from { transform: translateY(-5px); opacity: 0; }
+}
+
+.v2-shimmer .shimmer-tab:hover,
+.v2-shimmer.force-hover .shimmer-tab {
+  color: var(--label);
+}
+
+.v2-shimmer .shimmer-tab .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex: none;
+}
+
+.v2-shimmer .shimmer-tab .icon {
+  animation: v2-pop 0.3s var(--v2-spring) both;
+}
+
+/* Copy: the sweep replays in green; the tab flips to Copied. */
+.v2-shimmer.copied .shimmer-line {
+  background-image: linear-gradient(
+    100deg,
+    var(--green) 30%,
+    color-mix(in srgb, var(--green) 45%, #fff) 50%,
+    var(--green) 70%
+  );
+  animation: v2-line-shimmer 0.35s ease-out both;
+}
+
+.v2-shimmer.copied .shimmer-tab {
+  color: var(--green);
+}
+
+/* ---------- V3 Split capsule ---------- */
+
+.v2-split {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  animation: v2-split-land 0.32s var(--v2-spring) both;
+  transition: gap 0.22s var(--v2-spring);
+  user-select: none;
+}
+
+@keyframes v2-split-land {
+  from { transform: translateY(6px) scale(0.9); opacity: 0; }
+}
+
+.v2-split .half {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--separator) 45%, transparent),
+    0 3px 12px rgba(0, 0, 0, 0.18);
+  transition:
+    border-radius 0.22s var(--v2-spring),
+    background-color 0.16s ease-out,
+    color 0.16s ease-out;
+}
+
+.v2-split .half.saved {
+  padding: 0 10px;
+  border-radius: 10px 3px 3px 10px;
+}
+
+.v2-split .half.copy {
+  width: 34px;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--secondary-label);
+  border-radius: 3px 10px 10px 3px;
+  cursor: default;
+}
+
+.v2-split:hover,
+.v2-split.force-hover {
+  gap: 5px;
+}
+
+.v2-split:hover .half,
+.v2-split.force-hover .half {
+  border-radius: 10px;
+}
+
+.v2-split .half.copy:hover,
+.v2-split.force-hover .half.copy {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Copy: the halves snap back together; the copy half fills green. */
+.v2-split.copied,
+.v2-split.copied:hover {
+  gap: 0;
+}
+
+.v2-split.copied .half.saved,
+.v2-split.copied:hover .half.saved {
+  border-radius: 10px 3px 3px 10px;
+}
+
+.v2-split.copied .half.copy,
+.v2-split.copied .half.copy:hover {
+  background: var(--green);
+  color: #fff;
+  border-radius: 3px 10px 10px 3px;
+}
+
+.v2-split .half.copy .v2-check-pop {
+  color: inherit;
+}
+
+/* ---------- V5 Morph: zero-UI at rest ---------- */
+
+.v2-morph {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 5px;
+  border-radius: 15px;
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow: var(--v2-material-shadow);
+  animation: v2-pop-in 0.28s var(--v2-spring) both;
+  transition: background-color 0.25s ease-out;
+  user-select: none;
+}
+
+.v2-morph .morph-check {
+  width: 19px;
+  height: 19px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v2-morph .morph-extra {
+  display: flex;
+  align-items: center;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.26s var(--v2-spring), opacity 0.16s ease-out;
+}
+
+.v2-morph:hover .morph-extra,
+.v2-morph.force-hover .morph-extra,
+.v2-morph.copied .morph-extra {
+  max-width: 56px;
+  opacity: 1;
+}
+
+.v2-morph .morph-extra .v2-divider {
+  margin: 0 7px 0 8px;
+}
+
+/* Copy: the chip itself blushes green while the check pops. */
+.v2-morph.copied {
+  background: color-mix(in srgb, var(--green) 14%, var(--toast-material));
+}
+
+/* ---------- V6 Trace: the pill draws itself ---------- */
+
+.v2-trace {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 10px;
+  user-select: none;
+}
+
+.v2-trace .trace-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--toast-material);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  box-shadow: var(--v2-material-shadow);
+  animation: v2-fade-in 0.22s ease-out 0.16s both;
+}
+
+.v2-trace .trace-outline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.v2-trace .trace-outline svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* pathLength=1 → SwiftUI trim(from:to:). Draws in, then dissolves. */
+.v2-trace .trace-outline rect {
+  width: calc(100% - 1.5px);
+  height: calc(100% - 1.5px);
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation:
+    v2-trace-draw 0.32s var(--v2-ease) both,
+    v2-fade-out 0.3s ease-out 0.55s both;
+}
+
+@keyframes v2-trace-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.v2-trace .trace-content {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  animation: v2-fade-in 0.2s ease-out 0.14s both;
+}
+
+/* Copy: re-trace in green (duplicate keyframes force a restart)… */
+.v2-trace.copied .trace-outline rect {
+  stroke: var(--green);
+  animation:
+    v2-trace-redraw 0.3s var(--v2-ease) both,
+    v2-fade-out-again 0.3s ease-out 0.45s both;
+}
+
+@keyframes v2-trace-redraw {
+  from { stroke-dashoffset: 1; opacity: 1; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes v2-fade-out-again {
+  to { opacity: 0; }
+}
+
+/* …while the check draws itself stroke-by-stroke. */
+.v2-trace .trace-done {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green);
+}
+
+.v2-trace .trace-done path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: v2-trace-draw 0.28s var(--v2-ease) 0.05s both;
+}
+
+/* ---------- lifecycle stage + comparison board ---------- */
+
+.v2-stage {
+  position: relative;
+  width: 560px;
+  height: 240px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--popover-material) 55%, transparent);
+  padding: 28px 32px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--label);
+  box-sizing: border-box;
+}
+
+.v2-highlight {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 2px;
+}
+
+.v2-stage .replay {
+  position: absolute;
+  left: 32px;
+  bottom: 20px;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  color: #fff;
+  background: var(--accent);
+  cursor: default;
+}
+
+.v2-stage .hint {
+  position: absolute;
+  right: 32px;
+  bottom: 24px;
+  font-size: 10px;
+  color: var(--tertiary-label);
+}
+
+.v2-board {
+  display: grid;
+  grid-template-columns: 150px repeat(3, minmax(160px, 1fr));
+  gap: 6px 20px;
+  align-items: center;
+  padding: 24px 28px 28px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--popover-material) 55%, transparent);
+}
+
+.v2-board .colhead {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tertiary-label);
+  padding-bottom: 6px;
+}
+
+.v2-board .rowlabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label);
+}
+
+.v2-board .rowlabel small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--secondary-label);
+}
+
+.v2-board .cell {
+  position: relative;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+}
+
+/* Absolute-positioned variants need a static footprint on the board. */
+.v2-board .v2-ink {
+  position: relative;
+  margin-left: 12px;
+}
+
+.v2-board .v2-shimmer {
+  position: relative;
+  width: 170px;
+}
+
+/* ==========================================================================
+   V2 styles: selection action
+   Five visual treatments of the CANONICAL pill layout/behavior
+   (SelectionActionStyles.stories.js). Round-7 survivors, ranked:
+   S2, T10, S1, S9c, S9d, S12, T2 (+ a/b/c iteration modifiers). They modify the
+   base .selection-action; `.force-hover` mirrors :hover for static boards.
+   ========================================================================== */
+
+.desktop[data-theme='light'] {
+  --sa-glass-fill: rgba(255, 255, 255, 0.38);
+  --sa-glass-rim: rgba(255, 255, 255, 0.7);
+}
+
+.desktop[data-theme='dark'] {
+  --sa-glass-fill: rgba(66, 66, 72, 0.42);
+  --sa-glass-rim: rgba(255, 255, 255, 0.26);
+}
+
+/* Forced hover for static boards: canonical copy-button hover color. */
+.selection-action.force-hover .copy-button {
+  color: var(--label);
+}
+
+/* ---------- S1 Liquid Glass: lensing translucency, specular rim ---------- */
+
+.selection-action.sa-s1 {
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%),
+    var(--sa-glass-fill);
+  backdrop-filter: blur(26px) saturate(230%);
+  -webkit-backdrop-filter: blur(26px) saturate(230%);
+  box-shadow:
+    inset 0 1px 0 var(--sa-glass-rim),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.12),
+    inset 1px 0 0.5px rgba(255, 255, 255, 0.14),
+    inset -1px 0 0.5px rgba(255, 255, 255, 0.14),
+    0 0 0 0.5px color-mix(in srgb, var(--separator) 35%, transparent),
+    0 10px 30px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+  animation: sa-glass-in 0.3s var(--v2-spring) both;
+  transition: transform 0.25s var(--v2-ease);
+}
+
+@keyframes sa-glass-in {
+  from { transform: scale(0.9); opacity: 0; }
+}
+
+/* Gentle lensing swell when the pointer arrives. */
+.selection-action.sa-s1:hover,
+.selection-action.sa-s1.force-hover {
+  transform: scale(1.03);
+}
+
+.sa-s1 .divider {
+  background: color-mix(in srgb, var(--separator) 70%, transparent);
+}
+
+.sa-s1 .copied-check {
+  animation: v2-pop 0.3s var(--v2-spring) both;
+}
+
+/* ---------- S2 Ink / HUD: dark chip in both themes, quiet, pro ---------- */
+
+.selection-action.sa-s2 {
+  --material-opaque: #2c2c2e; /* doc.on.doc knockout stays dark */
+  border-radius: 12px;
+  background: rgba(30, 30, 32, 0.94);
+  backdrop-filter: blur(28px) saturate(130%);
+  -webkit-backdrop-filter: blur(28px) saturate(130%);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.28);
+  animation: sa-hud-in 0.18s ease-out both;
+}
+
+@keyframes sa-hud-in {
+  from { transform: translateY(3px); opacity: 0; }
+}
+
+.sa-s2 .divider {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sa-s2 .copy-button {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sa-s2 .copy-button:hover,
+.sa-s2.force-hover .copy-button {
+  color: #fff;
+}
+
+.sa-s2 .copied-check {
+  color: #32d74b; /* systemGreen dark, on the dark chip in both themes */
+}
+
+/* Template app icon renders white, like a menu-bar icon on the HUD. */
+.sa-s2 .saved-badge .icon {
+  color: #fff;
+}
+
+/* ---------- S9 family: hardware instrument displays ---------- */
+/* Shared face metrics; each member sets its own surface + glyph rendering. */
+
+.selection-action.sa-s9c,
+.selection-action.sa-s9d {
+  padding: 0 11px;
+  border-radius: 7px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* -- S9c OLED white: true black, pure white, zero bloom -- */
+
+.selection-action.sa-s9c {
+  min-height: 30px; /* letterboxed feel */
+  color: #fff;
+  background: #000;
+  --material-opaque: #000;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 3px 12px rgba(0, 0, 0, 0.45);
+  animation: v2-fade-in 0.1s linear both; /* instant, crisp */
+}
+
+.sa-s9c .divider {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.sa-s9c .check-badge {
+  display: none;
+}
+
+.sa-s9c .saved-badge .icon {
+  color: #fff; /* template icon, no glow */
+}
+
+.sa-s9c .copy-button {
+  color: rgba(255, 255, 255, 0.55);
+  transition: none; /* state flips, never fades */
+}
+
+.sa-s9c .copy-button:hover,
+.sa-s9c.force-hover .copy-button {
+  color: #fff;
+}
+
+.sa-s9c .copied-check {
+  color: #fff;
+  animation: none;
+}
+
+/* -- S9d E-paper: ink on paper, inversion refresh -- */
+
+.selection-action.sa-s9d {
+  color: #1d1b17;
+  background: #eceae3; /* physically light in both themes */
+  --material-opaque: #eceae3;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.25);
+  animation: sa-epaper-refresh 0.24s linear both; /* e-ink ghost flash */
+}
+
+@keyframes sa-epaper-refresh {
+  0%, 45% { filter: invert(1); }
+  46%, 100% { filter: invert(0); }
+}
+
+.sa-s9d .divider {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.sa-s9d .check-badge {
+  display: none;
+}
+
+.sa-s9d .copy-button {
+  color: rgba(0, 0, 0, 0.55);
+  transition: none;
+}
+
+.sa-s9d .copy-button:hover,
+.sa-s9d.force-hover .copy-button {
+  color: #1d1b17;
+}
+
+.sa-s9d .copied-check {
+  color: #1d1b17;
+  animation: none;
+}
+
+/* Copy re-runs the page refresh (duplicate keyframes force a restart). */
+.sa-s9d:has(.copied-check) {
+  animation: sa-epaper-again 0.24s linear both;
+}
+
+@keyframes sa-epaper-again {
+  0%, 45% { filter: invert(1); }
+  46%, 100% { filter: invert(0); }
+}
+
+/* ---------- S12 Monospace minimal: techy but native-clean ---------- */
+
+.selection-action.sa-s12 {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.sa-s12 .copy-button {
+  width: auto;
+  padding: 0 5px;
+}
+
+.sa-s12 .copy-button .icon {
+  display: none;
+}
+
+.sa-s12 .copy-button::before {
+  content: 'copy';
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+}
+
+.sa-s12 .copied-check {
+  width: auto;
+  padding: 0 5px;
+}
+
+.sa-s12 .copied-check .icon {
+  display: none;
+}
+
+.sa-s12 .copied-check::before {
+  content: '✓ copied';
+  font-size: 10.5px;
+}
+
+/* ==================== Round 6 exploration: T1–T10 ==================== */
+
+/* ---------- T2 Linear glow: the only light is the action ---------- */
+
+.selection-action.sa-t2 {
+  border-radius: 10px;
+  background: #1b1b1f; /* matte, both themes */
+  --material-opaque: #1b1b1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: v2-fade-in 0.15s ease-out both;
+}
+
+.sa-t2 .divider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sa-t2 .saved-badge .icon {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sa-t2 .check-badge {
+  display: none; /* nothing glows except the action */
+}
+
+.sa-t2 .copy-button {
+  position: relative;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sa-t2 .copy-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: radial-gradient(
+    120% 100% at 50% 100%,
+    rgba(249, 115, 22, 0.28),
+    rgba(236, 72, 153, 0.12) 55%,
+    transparent 80%
+  );
+  opacity: 0.45;
+  transition: opacity 0.2s ease-out;
+}
+
+.sa-t2 .copy-button .icon {
+  position: relative;
+}
+
+.sa-t2 .copy-button:hover,
+.sa-t2.force-hover .copy-button {
+  color: #fff;
+}
+
+.sa-t2 .copy-button:hover::before,
+.sa-t2.force-hover .copy-button::before {
+  opacity: 1;
+}
+
+/* Copied: green bloom that settles. */
+.sa-t2 .copied-check {
+  position: relative;
+  color: #4ade80;
+}
+
+.sa-t2 .copied-check .icon {
+  position: relative;
+}
+
+.sa-t2 .copied-check::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: radial-gradient(120% 100% at 50% 100%, rgba(74, 222, 128, 0.35), transparent 75%);
+  animation: sa-t2-bloom 0.35s ease-out both;
+}
+
+@keyframes sa-t2-bloom {
+  0% { opacity: 0; }
+  45% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+
+/* ---------- T10 Warm paper: iA/Bear cozy (stays light) ---------- */
+
+.selection-action.sa-t10 {
+  border-radius: 12px;
+  color: #4a3f35;
+  background: #f6efe4; /* cream in both themes — deliberate */
+  --material-opaque: #f6efe4;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    0 1px 2px rgba(90, 60, 40, 0.08),
+    0 6px 18px rgba(90, 60, 40, 0.18);
+  animation: v2-pop-in 0.25s var(--v2-ease) both;
+}
+
+.sa-t10 .divider {
+  background: rgba(74, 63, 53, 0.2);
+}
+
+/* Terracotta accent dot instead of the green circle. */
+.sa-t10 .check-badge svg {
+  display: none;
+}
+
+.sa-t10 .check-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c96f4a;
+  box-shadow: 0 0 0 1.5px #f6efe4;
+}
+
+.sa-t10 .copy-button {
+  border-radius: 7px;
+  color: rgba(74, 63, 53, 0.6);
+}
+
+.sa-t10 .copy-button:hover,
+.sa-t10.force-hover .copy-button {
+  color: #4a3f35;
+  background: rgba(201, 111, 74, 0.14);
+}
+
+/* Copied: letterpress stamp. */
+.sa-t10 .copied-check {
+  color: #4a3f35;
+  animation: sa-t10-stamp 0.22s ease-out both;
+}
+
+@keyframes sa-t10-stamp {
+  from { transform: scale(1.6); opacity: 0; }
+}
+
+/* ---------- paste-confirmation siblings keep their compact metrics ---------- */
+
+.selection-action.paste-confirmation.sa-s1,
+.selection-action.paste-confirmation.sa-s2 {
+  min-height: 0;
+  padding: 7px;
+}
+
+.selection-action.paste-confirmation.sa-s9c,
+.selection-action.paste-confirmation.sa-s9d {
+  min-height: 0;
+  padding: 7px 8px;
+}
+
+/* ---------- style strip + board ---------- */
+
+.sa-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, auto));
+  gap: 6px 28px;
+  align-items: center;
+  justify-items: start;
+  padding: 24px 28px 28px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--popover-material) 55%, transparent);
+}
+
+.sa-strip .colhead {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tertiary-label);
+}
+
+.sa-strip .cell {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.v2-board.sa-board {
+  grid-template-columns: 150px repeat(4, minmax(150px, 1fr));
+}
+
+/* ==================== Round 7: survivor iterations ==================== */
+/* Modifier classes explore each survivor's own parameter space.
+   Row "current" in the Iterations boards is the unmodified base. */
+
+/* -- S2 Ink/HUD -- */
+
+/* a - tone: warmer, deeper black */
+.sa-s2.sa-s2-a {
+  background: rgba(36, 31, 27, 0.96);
+  --material-opaque: #241f1b;
+}
+
+/* b - geometry: full capsule, tighter */
+.sa-s2.sa-s2-b {
+  border-radius: 999px;
+  padding: 0 8px;
+  gap: 7px;
+}
+
+/* c - feedback: the whole chip acknowledges the copy */
+.sa-s2.sa-s2-c:has(.copied-check) {
+  animation: sa-s2c-tint 0.35s ease-out both;
+}
+
+@keyframes sa-s2c-tint {
+  0% { background-color: rgba(30, 30, 32, 0.94); }
+  35% { background-color: rgba(34, 66, 46, 0.95); }
+  100% { background-color: rgba(30, 36, 32, 0.94); }
+}
+
+/* -- T10 Warm paper -- */
+
+/* a - palette: paler cream, deeper terracotta */
+.sa-t10.sa-t10-a {
+  background: #faf5ec;
+  --material-opaque: #faf5ec;
+  color: #46372c;
+}
+
+.sa-t10.sa-t10-a .check-badge {
+  background: #b85c38;
+  box-shadow: 0 0 0 1.5px #faf5ec;
+}
+
+.sa-t10.sa-t10-a .copy-button:hover,
+.sa-t10.sa-t10-a.force-hover .copy-button {
+  background: rgba(184, 92, 56, 0.16);
+}
+
+/* b - shadow: crisper, closer to the page */
+.sa-t10.sa-t10-b {
+  box-shadow:
+    0 1px 2px rgba(90, 60, 40, 0.25),
+    0 3px 8px rgba(90, 60, 40, 0.12);
+}
+
+/* c - copied: terracotta ink spreads behind the check */
+.sa-t10.sa-t10-c .copied-check {
+  position: relative;
+  animation: none;
+}
+
+.sa-t10.sa-t10-c .copied-check .icon {
+  position: relative;
+}
+
+.sa-t10.sa-t10-c .copied-check::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: rgba(201, 111, 74, 0.28);
+  animation: sa-t10c-spread 0.3s ease-out both;
+}
+
+@keyframes sa-t10c-spread {
+  from { transform: scale(0); }
+}
+
+/* -- S1 Liquid Glass -- */
+
+/* a - thickness: heavier lensing, thicker rim */
+.sa-s1.sa-s1-a {
+  backdrop-filter: blur(34px) saturate(260%);
+  -webkit-backdrop-filter: blur(34px) saturate(260%);
+  box-shadow:
+    inset 0 1.5px 0 var(--sa-glass-rim),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
+    inset 1.5px 0 1px rgba(255, 255, 255, 0.18),
+    inset -1.5px 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 0.5px color-mix(in srgb, var(--separator) 35%, transparent),
+    0 12px 34px rgba(0, 0, 0, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* b - radius: 14px instead of near-capsule */
+.sa-s1.sa-s1-b {
+  border-radius: 14px;
+}
+
+/* c - hover: specular slide instead of swell */
+.sa-s1.sa-s1-c {
+  position: relative;
+}
+
+.sa-s1.sa-s1-c:hover,
+.sa-s1.sa-s1-c.force-hover {
+  transform: none;
+}
+
+.sa-s1.sa-s1-c::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.3) 48%, transparent 62%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sa-s1.sa-s1-c:hover::after,
+.sa-s1.sa-s1-c.force-hover::after {
+  opacity: 1;
+  animation: sa-s1c-slide 0.35s ease-out both;
+}
+
+@keyframes sa-s1c-slide {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+
+/* -- S9c OLED white -- */
+
+/* a - letterbox: shorter, wider, cinematic */
+.sa-s9c.sa-s9c-a {
+  min-height: 26px;
+  padding: 0 14px;
+  border-radius: 6px;
+}
+
+/* b - hierarchy: the action is the brightest thing */
+.sa-s9c.sa-s9c-b .saved-badge .icon {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sa-s9c.sa-s9c-b .copy-button {
+  color: #fff;
+}
+
+/* c - state flip: two crisp frames instead of instant */
+.sa-s9c.sa-s9c-c .copied-check {
+  animation: sa-s9cc-flip 0.12s steps(2, end) both;
+}
+
+@keyframes sa-s9cc-flip {
+  from { opacity: 0; }
+}
+
+/* -- S9d E-paper -- */
+
+/* a - refresh: double-pulse inversion, e-ink honest */
+.sa-s9d.sa-s9d-a {
+  animation: sa-s9da-refresh 0.32s linear both;
+}
+
+@keyframes sa-s9da-refresh {
+  0%, 25% { filter: invert(1); }
+  26%, 42% { filter: invert(0); }
+  43%, 62% { filter: invert(1); }
+  63%, 100% { filter: invert(0); }
+}
+
+/* b - face: pure white panel */
+.sa-s9d.sa-s9d-b {
+  background: #f7f7f5;
+  --material-opaque: #f7f7f5;
+  color: #191817;
+}
+
+/* c - ghosting: residual afterimage after the refresh */
+.sa-s9d.sa-s9d-c > * {
+  animation: sa-s9dc-ghost 0.3s steps(2, end) 0.2s both;
+}
+
+@keyframes sa-s9dc-ghost {
+  from { opacity: 0.45; }
+}
+
+/* -- S12 Monospace minimal -- */
+
+/* a - copy affordance: icon-only, mono voice kept for the echo */
+.sa-s12.sa-s12-a .copy-button {
+  width: 28px;
+  padding: 0;
+}
+
+.sa-s12.sa-s12-a .copy-button .icon {
+  display: flex;
+}
+
+.sa-s12.sa-s12-a .copy-button::before {
+  content: none;
+}
+
+/* b - density: tighter chip */
+.sa-s12.sa-s12-b {
+  min-height: 28px;
+  padding: 0 7px;
+  gap: 7px;
+  border-radius: 8px;
+}
+
+/* c - echo phrasing: just the glyph */
+.sa-s12.sa-s12-c .copied-check::before {
+  content: '\2713';
+}
+
+/* -- T2 Linear glow -- */
+
+/* a - hue: marker-orange only, on brand */
+.sa-t2.sa-t2-a .copy-button::before {
+  background: radial-gradient(
+    120% 100% at 50% 100%,
+    rgba(232, 118, 13, 0.32),
+    rgba(245, 166, 35, 0.1) 60%,
+    transparent 80%
+  );
+}
+
+/* b - scope: faint ambient rising from the chip's lower edge */
+.sa-t2.sa-t2-b {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 -14px 24px -18px rgba(249, 115, 22, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* c - copied: the glow dies to an ember, the check stays white */
+.sa-t2.sa-t2-c .copied-check {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sa-t2.sa-t2-c .copied-check::before {
+  background: radial-gradient(
+    120% 100% at 50% 100%,
+    rgba(249, 115, 22, 0.4),
+    rgba(236, 72, 153, 0.15) 55%,
+    transparent 80%
+  );
+  animation: sa-t2c-die 0.35s ease-out both;
+}
+
+@keyframes sa-t2c-die {
+  0% { opacity: 1; }
+  100% { opacity: 0.18; }
+}
+
+/* ==================== Round 8: finalist affordance ==================== */
+/* Status must read passive; copy must read pressable.
+   Language: container = pressable, bare = status. The paste sibling has
+   no action, so it stays a bare icon in every treatment. */
+
+/* -- S2 a/d: contained action (keycap copy, bare status) -- */
+
+.sa-s2.sa-s2-affa .copy-button,
+.sa-s2.sa-s2-affd .copy-button {
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.sa-s2.sa-s2-affa .copy-button:hover,
+.sa-s2.sa-s2-affa.force-hover .copy-button,
+.sa-s2.sa-s2-affd .copy-button:hover,
+.sa-s2.sa-s2-affd.force-hover .copy-button {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sa-s2.sa-s2-affa .saved-badge,
+.sa-s2.sa-s2-affd .saved-badge {
+  cursor: default;
+}
+
+/* d also dims the status a touch: quiet, but still legible */
+.sa-s2.sa-s2-affd .saved-badge {
+  opacity: 0.8;
+}
+
+/* -- S2 b: brightness hierarchy -- */
+
+.sa-s2.sa-s2-affb .saved-badge {
+  opacity: 0.72; /* permanent; does not react to chip hover */
+}
+
+.sa-s2.sa-s2-affb .copy-button {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sa-s2.sa-s2-affb .copy-button:hover,
+.sa-s2.sa-s2-affb.force-hover .copy-button {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+}
+
+/* -- S9c a/d: contained action, OLED-flat and instant -- */
+
+.sa-s9c.sa-s9c-affa .copy-button,
+.sa-s9c.sa-s9c-affd .copy-button {
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.sa-s9c.sa-s9c-affd .copy-button {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sa-s9c.sa-s9c-affa .copy-button:hover,
+.sa-s9c.sa-s9c-affa.force-hover .copy-button,
+.sa-s9c.sa-s9c-affd .copy-button:hover,
+.sa-s9c.sa-s9c-affd.force-hover .copy-button {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sa-s9c.sa-s9c-affa .saved-badge,
+.sa-s9c.sa-s9c-affd .saved-badge {
+  cursor: default;
+}
+
+.sa-s9c.sa-s9c-affd .saved-badge {
+  opacity: 0.8;
+}
+
+/* -- S9c b: brightness hierarchy -- */
+
+.sa-s9c.sa-s9c-affb .saved-badge {
+  opacity: 0.7;
+}
+
+.sa-s9c.sa-s9c-affb .copy-button {
+  color: #fff;
+}
+
+.sa-s9c.sa-s9c-affb .copy-button:hover,
+.sa-s9c.sa-s9c-affb.force-hover .copy-button {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+}
+
+/* -- S2/S9c c: micro-caption "saved" beside the badge on chip hover -- */
+/* The caption is a flex pseudo slotted between badge and divider via
+   `order`; the collapsed negative margin cancels the flex gap. */
+
+.sa-s2.sa-s2-affc::before,
+.sa-s9c.sa-s9c-affc::before {
+  content: 'saved';
+  order: 1;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 0;
+  margin-left: -9px;
+  opacity: 0;
+  transition:
+    max-width 0.25s var(--v2-ease),
+    margin-left 0.25s var(--v2-ease),
+    opacity 0.18s ease-out;
+}
+
+.sa-s2.sa-s2-affc .divider,
+.sa-s9c.sa-s9c-affc .divider {
+  order: 2;
+}
+
+.sa-s2.sa-s2-affc .copy-button,
+.sa-s2.sa-s2-affc .copied-check,
+.sa-s9c.sa-s9c-affc .copy-button,
+.sa-s9c.sa-s9c-affc .copied-check {
+  order: 3;
+}
+
+.sa-s2.sa-s2-affc:hover::before,
+.sa-s2.sa-s2-affc.force-hover::before,
+.sa-s9c.sa-s9c-affc:hover::before,
+.sa-s9c.sa-s9c-affc.force-hover::before {
+  max-width: 3.5em;
+  margin-left: -4px;
+  opacity: 1;
+}
+
+.sa-s2.sa-s2-affc::before {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sa-s9c.sa-s9c-affc::before {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sa-s2-affc.paste-confirmation::before,
+.sa-s9c-affc.paste-confirmation::before {
+  content: 'pasted';
+}
+
+/* ==========================================================================
+   V2 motion: selection action
+   Motion-as-explanation concepts on the neutral native pill
+   (SelectionActionMotion.stories.js). Added motion ≤0.4s each; the timing
+   contract stays native. Classes .sam-m1 … .sam-m6 + stage props.
+   ========================================================================== */
+
+/* Stage variant with the fake menu bar (Marker status icon top-right). */
+.v2-stage.has-menubar {
+  overflow: hidden; /* clip the bar to the stage's rounded corners */
+}
+
+.v2-stage.has-menubar .menubar {
+  z-index: 1;
+}
+
+/* ---------- M1 Born from selection ---------- */
+
+.selection-action.sam-m1 {
+  transform-origin: 0 0; /* the mouse-up corner */
+  animation: sam-born 0.3s var(--v2-spring) both;
+}
+
+@keyframes sam-born {
+  from { transform: scale(0.3); opacity: 0; }
+}
+
+/* The selection acknowledges the birth with one accent flash. */
+.v2-highlight.sam-flash {
+  animation: sam-hl-flash 0.35s ease-out both;
+}
+
+@keyframes sam-hl-flash {
+  0% { background-color: color-mix(in srgb, var(--accent) 65%, transparent); }
+}
+
+.sam-tether {
+  position: absolute;
+  height: 1px;
+  background: var(--accent);
+  transform-origin: left center;
+  pointer-events: none;
+  animation: v2-fade-out 0.3s ease-out 0.1s both;
+}
+
+/* ---------- M2 Ink absorb ---------- */
+
+.selection-action.sam-m2 {
+  animation: selection-action-in 0.12s ease-out both;
+}
+
+/* The highlight gives up its tint… */
+.v2-highlight.sam-drain {
+  animation: sam-hl-drain 0.35s ease-out 0.05s both;
+}
+
+@keyframes sam-hl-drain {
+  to { background-color: transparent; }
+}
+
+/* …carried by an ink drop… */
+.sam-ink-dot {
+  position: absolute;
+  z-index: 3;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+  transition:
+    transform 0.3s cubic-bezier(0.5, 0, 0.9, 0.5),
+    opacity 0.12s ease-out 0.22s;
+}
+
+/* …and the badge only lights up when it lands. */
+.sam-m2 .saved-badge {
+  opacity: 0.35;
+  transition: opacity 0.2s ease-out;
+}
+
+.sam-m2.sam-landed .saved-badge {
+  opacity: 1;
+}
+
+.sam-m2.sam-landed .check-badge {
+  animation: v2-pop 0.25s var(--v2-spring) both;
+}
+
+/* ---------- M3 Into the menu bar ---------- */
+
+.selection-action.sam-m3 {
+  animation: selection-action-in 0.12s ease-out both;
+}
+
+.selection-action.sam-collapse {
+  animation: sam-collapse 0.18s ease-in both;
+}
+
+@keyframes sam-collapse {
+  to { transform: scale(0.35); opacity: 0; }
+}
+
+/* Two-axis arc: X runs linear, Y eases in — the dot swoops up-right. */
+.sam-fly-dot {
+  position: absolute;
+  z-index: 3;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.sam-fly-dot::before {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.sam-fly-dot.go {
+  animation: sam-fly-x 0.35s linear both;
+}
+
+.sam-fly-dot.go::before {
+  animation: sam-fly-y 0.35s cubic-bezier(0.55, 0, 0.85, 0.4) both;
+}
+
+@keyframes sam-fly-x {
+  to { transform: translateX(var(--dx)); }
+}
+
+@keyframes sam-fly-y {
+  to { transform: translateY(var(--dy)) scale(0.5); }
+}
+
+/* The status icon acknowledges the arrival. */
+.status-icon.sam-blip {
+  animation: sam-blip 0.3s var(--v2-spring) both;
+}
+
+@keyframes sam-blip {
+  40% { transform: translateY(2px) scale(1.18); }
+}
+
+/* ---------- M4 “+1” tick ---------- */
+
+.selection-action.sam-m4 {
+  position: relative;
+  animation: selection-action-in 0.12s ease-out both;
+}
+
+.sam-plus {
+  position: absolute;
+  top: -13px;
+  left: 8px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  animation: sam-plus 0.4s ease-out 0.12s both;
+}
+
+@keyframes sam-plus {
+  0% { opacity: 0; transform: translateY(4px); }
+  30% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-7px); }
+}
+
+/* ---------- M5 Copy handoff ---------- */
+
+.selection-action.sam-m5 {
+  animation: selection-action-in 0.12s ease-out both;
+}
+
+.sam-ghost {
+  position: absolute;
+  z-index: 3;
+  color: var(--secondary-label);
+  pointer-events: none;
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.8, 0.6),
+    opacity 0.18s ease-out 0.15s;
+}
+
+.sam-ghost.go {
+  transform: translate(var(--gx), var(--gy)) scale(0.6);
+  opacity: 0;
+}
+
+/* ---------- M6 Directional settle ---------- */
+
+/* Arrives FROM the selection direction with a soft overshoot… */
+.selection-action.sam-m6 {
+  animation: sam-arrive 0.3s var(--v2-spring) both;
+}
+
+@keyframes sam-arrive {
+  from { transform: translate(-6px, -6px); opacity: 0; }
+}
+
+/* …and retreats back TOWARD it on timeout. */
+.selection-action.sam-m6-exit {
+  animation: sam-depart 0.25s ease-in both;
+}
+
+@keyframes sam-depart {
+  to { transform: translate(-8px, -8px); opacity: 0; }
+}
+
+/* ---------- AllMotion index grid ---------- */
+
+.sam-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(560px, auto));
+  gap: 28px 24px;
+}
+
+.sam-cell .sam-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label);
+}
+
+/* ==========================================================================
+   Round 9: final motion package (S2 + S9c finalists, d-affordance)
+   Frequency-tiered: daily motion minimal, teaching motion rare.
+   Placed last in the cascade so dismiss classes beat :has() feedback rules.
+   ========================================================================== */
+
+/* APPEAR — directional settle from the selection, slight overshoot. */
+.selection-action.fin-appear {
+  animation: fin-arrive 0.3s var(--v2-spring) both;
+}
+
+@keyframes fin-arrive {
+  from { transform: translate(-6px, -6px); opacity: 0; }
+}
+
+.selection-action.fin-appear.fin-reduced {
+  animation: v2-fade-in 0.15s ease-out both;
+}
+
+/* PASTE — rises 4px + fades in, holds, stage fades it at 0.9s. */
+.selection-action.fin-paste {
+  animation: fin-paste-rise 0.12s ease-out both;
+}
+
+@keyframes fin-paste-rise {
+  from { transform: translateY(4px); opacity: 0; }
+}
+
+.selection-action.fin-paste.fin-reduced {
+  animation: v2-fade-in 0.12s ease-out both;
+}
+
+/* HOVER — keycap brightness only, 0.1s, zero geometry. */
+.fin-s2 .copy-button,
+.fin-s9c .copy-button {
+  transition: color 0.1s ease-out, background-color 0.1s ease-out;
+}
+
+/* COPY FEEDBACK — S2: local pop + half-strength tint, settles to nothing. */
+.fin-s2 .copied-check {
+  animation: fin-pop 0.25s var(--v2-spring) both;
+}
+
+@keyframes fin-pop {
+  from { transform: scale(1.4); opacity: 0; }
+}
+
+.fin-s2:not(.fin-reduced):has(.copied-check) {
+  animation: fin-s2-tint 0.35s ease-out both;
+}
+
+@keyframes fin-s2-tint {
+  0% { background-color: rgba(30, 30, 32, 0.94); }
+  35% { background-color: rgba(31, 47, 38, 0.94); }
+  100% { background-color: rgba(30, 30, 32, 0.94); }
+}
+
+/* COPY FEEDBACK — S9c: instant flip + one-frame chip blink. */
+.fin-s9c .copied-check {
+  animation: none;
+}
+
+.fin-s9c:not(.fin-reduced):has(.copied-check) {
+  animation: fin-s9c-blink 0.1s linear both;
+}
+
+@keyframes fin-s9c-blink {
+  0%, 49% { background-color: #3a3a3a; }
+  50%, 100% { background-color: #000; }
+}
+
+/* REDUCE MOTION — feedback collapses to a pure fade. */
+.fin-reduced .copied-check {
+  animation: v2-fade-in 0.12s ease-out both;
+}
+
+/* DISMISS — placed last so it wins over the :has() feedback animations. */
+.desktop .selection-action.fin-exit-fade {
+  animation: v2-fade-out 0.15s ease-out both;
+}
+
+.desktop .selection-action.sam-collapse {
+  animation: sam-collapse 0.18s ease-in both;
+}
+
+.desktop .selection-action.v2-paste-out {
+  animation: v2-fade-out 0.15s ease-out both;
+}
+
+/* Second replay slot in the stage. */
+.v2-stage .replay.replay-paste {
+  left: 150px;
+  background: var(--quaternary-fill);
+  color: var(--label);
+}
+
+/* ==========================================================================
+   Round 10: system coherence — picker UI in each finalist's language.
+   Scoped overrides only (.sys-s2 / .sys-s9c); builders untouched. Most of
+   the restyle rides the CSS tokens the builders already consume.
+   ========================================================================== */
+
+.sys-stage {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.sys-stage .sys-pill-slot {
+  padding-top: 48px;
+}
+
+/* ---------- S2 system: soft dark HUD, keycap interactions ---------- */
+
+.sys-s2 .panel,
+.sys-s2 .popover {
+  --label: rgba(255, 255, 255, 0.9);
+  --secondary-label: rgba(255, 255, 255, 0.55);
+  --tertiary-label: rgba(255, 255, 255, 0.3);
+  --quaternary-fill: rgba(255, 255, 255, 0.09);
+  --quaternary-fill-half: rgba(255, 255, 255, 0.06);
+  --separator: rgba(255, 255, 255, 0.12);
+  --section-material: rgba(34, 33, 36, 0.96);
+  --accent: #30d158;                       /* green status accents */
+  --accent-selection: rgba(48, 209, 88, 0.2);
+  --accent-soft: rgba(48, 209, 88, 0.15);
+  --menu-highlight: rgba(255, 255, 255, 0.16);
+  color: var(--label);
+  background: rgba(32, 31, 34, 0.94);      /* warm deep black, like the pill */
+  backdrop-filter: blur(28px) saturate(130%);
+  -webkit-backdrop-filter: blur(28px) saturate(130%);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.3);         /* no border ring — HUD language */
+}
+
+/* Interactive = contained: rows hover like the pill's keycap. */
+.sys-s2 .history-row {
+  border-radius: 7px;
+}
+
+.sys-s2 .history-row:hover {
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.sys-s2 .history-row.selected,
+.sys-s2 .history-row.selected:hover {
+  background: rgba(48, 209, 88, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(48, 209, 88, 0.18);
+}
+
+.sys-s2 .search-field {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sys-s2 .gear-button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* Passive stays bare and slightly recessed. */
+.sys-s2 .app-icon-glyph {
+  filter: saturate(0.85);
+}
+
+/* ---------- S9c system: true-black OLED, instant, mono-leaning ---------- */
+
+.sys-s9c .panel,
+.sys-s9c .popover {
+  --label: rgba(255, 255, 255, 0.92);
+  --secondary-label: rgba(255, 255, 255, 0.55);
+  --tertiary-label: rgba(255, 255, 255, 0.3);
+  --quaternary-fill: rgba(255, 255, 255, 0.1);
+  --quaternary-fill-half: rgba(255, 255, 255, 0.07);
+  --separator: rgba(255, 255, 255, 0.14);
+  --section-material: #000;
+  --accent: #fff;
+  --accent-selection: rgba(255, 255, 255, 0.16);
+  --accent-soft: rgba(255, 255, 255, 0.12);
+  color: var(--label);
+  background: #000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 10px;                     /* letterboxed, tighter */
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 16px 44px rgba(0, 0, 0, 0.5);
+}
+
+/* Instant states, small radii, thin separators. */
+.sys-s9c .history-row {
+  border-radius: 4px;
+}
+
+.sys-s9c .history-row:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sys-s9c .history-row .time,
+.sys-s9c .history-row .actions {
+  transition: none;
+}
+
+.sys-s9c .search-field {
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Mono-leaning type discipline. */
+.sys-s9c .snippet {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+}
+
+.sys-s9c .day-header {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sys-s9c .popover-footer .hint {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* OLED shows no color it doesn't need. */
+.sys-s9c .app-icon-glyph {
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0.9;
+}
+
+/* ==========================================================================
+   S13 Catppuccin: terminal theme, Claude-Code CLI energy (late contender).
+   Authentic palette — Mocha in dark, Latte in light. Discrete steps()
+   motion, no glow, no scanlines. Ships affordance-correct by default:
+   bare status, keycap-contained action.
+   ========================================================================== */
+
+.desktop[data-theme='light'] {
+  --ctp-base: #eff1f5;
+  --ctp-surface: #ccd0da;
+  --ctp-text: #4c4f69;
+  --ctp-subtext: rgba(76, 79, 105, 0.62);
+  --ctp-green: #40a02b;
+  --ctp-peach: #fe640b;
+  --ctp-mauve: #8839ef;
+  --ctp-lavender: #7287fd;
+  --ctp-overlay: #9ca0b0;
+}
+
+.desktop[data-theme='dark'] {
+  --ctp-base: #1e1e2e;
+  --ctp-surface: #313244;
+  --ctp-text: #cdd6f4;
+  --ctp-subtext: rgba(205, 214, 244, 0.6);
+  --ctp-green: #a6e3a1;
+  --ctp-peach: #fab387;
+  --ctp-mauve: #cba6f7;
+  --ctp-lavender: #b4befe;
+  --ctp-overlay: #6c7086;
+}
+
+/* Palette-agnostic terminal pane: every color rides a --rice-* token,
+   skins swap the tokens (kitty-theme style). Default skin: Catppuccin. */
+.selection-action.sa-s13 {
+  --rice-bg: var(--ctp-base);
+  --rice-surface: var(--ctp-surface);
+  --rice-border: var(--ctp-surface);
+  --rice-text: var(--ctp-text);
+  --rice-dim: var(--ctp-subtext);
+  --rice-accent: var(--ctp-peach);
+  --rice-green: var(--ctp-green);
+  border-radius: 9px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--rice-text);
+  --green: var(--rice-green); /* the badge check adopts the palette */
+  background: var(--rice-bg);
+  --material-opaque: var(--rice-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 1px var(--rice-border), /* terminal pane border */
+    0 4px 14px rgba(0, 0, 0, 0.25);
+  animation: v2-fade-in 0.1s steps(2, end) both;
+}
+
+/* waybar/eww focused-window behavior: hovered pane takes the accent
+   border. 1px, instant, all skins. */
+.selection-action.sa-s13:hover,
+.selection-action.sa-s13.force-hover {
+  box-shadow:
+    inset 0 0 0 1px var(--rice-accent),
+    0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- rice skins (canonical repo hex, per macOS theme) ---------- */
+
+.sa-s13.rice-catppuccin {
+  /* explicit alias of the defaults above (Mocha / Latte) */
+  --rice-accent: var(--ctp-peach);
+}
+
+.desktop[data-theme='dark'] .sa-s13.rice-gruvbox {
+  --rice-bg: #282828;
+  --rice-surface: #3c3836;
+  --rice-border: #3c3836;
+  --rice-text: #ebdbb2;
+  --rice-dim: rgba(235, 219, 178, 0.55);
+  --rice-accent: #fe8019;
+  --rice-green: #b8bb26;
+}
+
+.desktop[data-theme='light'] .sa-s13.rice-gruvbox {
+  --rice-bg: #fbf1c7;
+  --rice-surface: #ebdbb2;
+  --rice-border: #d5c4a1;
+  --rice-text: #3c3836;
+  --rice-dim: rgba(60, 56, 54, 0.55);
+  --rice-accent: #af3a03;
+  --rice-green: #79740e;
+}
+
+.desktop[data-theme='dark'] .sa-s13.rice-tokyonight {
+  --rice-bg: #1a1b26;
+  --rice-surface: #292e42;
+  --rice-border: #292e42;
+  --rice-text: #c0caf5;
+  --rice-dim: rgba(192, 202, 245, 0.5);
+  --rice-accent: #7aa2f7;
+  --rice-green: #9ece6a;
+}
+
+.desktop[data-theme='light'] .sa-s13.rice-tokyonight {
+  --rice-bg: #e1e2e7;
+  --rice-surface: #c4c8da;
+  --rice-border: #c4c8da;
+  --rice-text: #3760bf;
+  --rice-dim: rgba(55, 96, 191, 0.55);
+  --rice-accent: #2e7de9;
+  --rice-green: #587539;
+}
+
+.desktop[data-theme='dark'] .sa-s13.rice-rosepine {
+  --rice-bg: #191724;
+  --rice-surface: #26233a;
+  --rice-border: #26233a;
+  --rice-text: #e0def4;
+  --rice-dim: rgba(224, 222, 244, 0.5);
+  --rice-accent: #c4a7e7; /* iris */
+  --rice-green: #9ccfd8;  /* foam plays the success role */
+}
+
+.desktop[data-theme='light'] .sa-s13.rice-rosepine {
+  --rice-bg: #faf4ed;
+  --rice-surface: #f4ede8;
+  --rice-border: #dfdad9;
+  --rice-text: #575279;
+  --rice-dim: rgba(87, 82, 121, 0.55);
+  --rice-accent: #907aa9; /* dawn iris */
+  --rice-green: #56949f;  /* dawn foam */
+}
+
+.sa-s13 .divider {
+  background: var(--rice-border);
+}
+
+/* Bare status: template icon tinted peach; spinner resolves into it. */
+.sa-s13 .saved-badge {
+  cursor: default;
+}
+
+.sa-s13 .saved-badge .icon {
+  color: var(--rice-accent);
+  animation: v2-fade-in 0.05s steps(1, end) 0.28s both;
+}
+
+.sa-s13 .check-badge {
+  animation: v2-fade-in 0.05s steps(1, end) 0.28s both;
+}
+
+/* 3-frame braille spinner tick on appear (discrete content frames). */
+.sa-s13 .saved-badge::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  color: var(--rice-accent);
+  font-size: 11px;
+  animation: sa-s13-spin 0.3s linear both;
+}
+
+@keyframes sa-s13-spin {
+  0%, 32% { content: '⠋'; opacity: 1; }
+  33%, 65% { content: '⠙'; opacity: 1; }
+  66%, 93% { content: '⠸'; opacity: 1; }
+  94%, 100% { content: ''; opacity: 0; }
+}
+
+/* Contained action: surface keycap, lavender-tinged hover. */
+.sa-s13 .copy-button {
+  border-radius: 6px;
+  background: var(--rice-surface);
+  color: var(--rice-dim);
+  cursor: pointer;
+  transition: none; /* CLI: states flip */
+}
+
+.sa-s13 .copy-button:hover,
+.sa-s13.force-hover .copy-button {
+  color: var(--rice-text);
+  background: color-mix(in srgb, var(--rice-surface) 82%, var(--rice-accent) 18%);
+}
+
+/* Idle: soft blinking block cursor after the last element. */
+.sa-s13::after {
+  content: '';
+  width: 5px;
+  height: 11px;
+  flex: none;
+  background: var(--rice-dim);
+  animation: sa-s13-blink 1.2s linear infinite;
+}
+
+@keyframes sa-s13-blink {
+  0%, 49% { opacity: 0.8; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Copied: spinner tick, then the finished task line prints. */
+.sa-s13 .copied-check {
+  width: auto;
+  padding: 0 5px;
+  color: var(--rice-green);
+}
+
+.sa-s13 .copied-check .icon {
+  display: none;
+}
+
+.sa-s13 .copied-check::before {
+  content: '✓ copied';
+  white-space: nowrap;
+  animation: sa-s13-done 0.3s linear both;
+}
+
+@keyframes sa-s13-done {
+  0%, 15% { content: '⠋'; color: var(--rice-accent); }
+  16%, 30% { content: '⠸'; color: var(--rice-accent); }
+  31%, 45% { content: '✓'; }
+  46%, 60% { content: '✓ cop'; }
+  61%, 100% { content: '✓ copied'; }
+}
+
+/* Paste sibling prints its own finished line; replaces the idle cursor. */
+.sa-s13.paste-confirmation::after {
+  content: '✓ pasted';
+  width: auto;
+  height: auto;
+  background: none;
+  margin-left: 2px;
+  color: var(--rice-green);
+  animation: sa-s13-pasted 0.3s linear both;
+}
+
+@keyframes sa-s13-pasted {
+  0%, 15% { content: '⠋'; color: var(--rice-accent); }
+  16%, 30% { content: '⠸'; color: var(--rice-accent); }
+  31%, 45% { content: '✓'; }
+  46%, 60% { content: '✓ pas'; }
+  61%, 100% { content: '✓ pasted'; }
 }

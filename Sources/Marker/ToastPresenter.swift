@@ -13,12 +13,6 @@ final class ToastPresenter {
         present(ToastView(text: snippet(of: text), appName: appName, bundleID: bundleID, warning: warning))
     }
 
-    /// Attribution for gesture pastes (three-finger click, middle-click):
-    /// they fire with no visible chrome, so say the insert was us.
-    func showPaste(text: String, source: PasteToastSource) {
-        present(PasteToastView(text: snippet(of: text), source: source))
-    }
-
     /// A popover pick landed in Marker's paste slot; tell the user how to
     /// fire it — the popover has already closed by the time this shows.
     func showReady(text: String, hotkeyLabel: String) {
@@ -32,7 +26,7 @@ final class ToastPresenter {
     }
 
     private func present(_ view: some View) {
-        let hosting = NSHostingView(rootView: view)
+        let hosting = NSHostingView(rootView: view.markerThemed())
         var size = hosting.fittingSize
         size.height = min(size.height, 120)
         let panel = self.panel ?? makePanel()
@@ -108,59 +102,11 @@ final class ToastPresenter {
     }
 }
 
-enum PasteToastSource {
-    case threeFingerClick
-    case threeFingerDoubleTap
-    case middleClick
-}
-
-private struct PasteToastView: View {
-    let text: String
-    let source: PasteToastSource
-
-    private var sourceLabel: Text {
-        switch source {
-        case .threeFingerClick: Text("three-finger click")
-        case .threeFingerDoubleTap: Text("three-finger double tap")
-        case .middleClick: Text("middle-click")
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 5) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .frame(width: 14, height: 14)
-                Text("Marker")
-                    .font(.caption2.weight(.semibold))
-                Text("· pasted via")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Image(systemName: source == .middleClick ? "computermouse" : "hand.tap")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                sourceLabel
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Text(text)
-                .font(.system(size: 12.5))
-                .lineLimit(3)
-                .truncationMode(.tail)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .frame(width: 330, alignment: .leading)
-        .toastBackground()
-        .padding(5)
-    }
-}
-
 private struct ReadyToastView: View {
     let text: String
     let hotkeyLabel: String
+
+    @Environment(\.markerTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -172,7 +118,7 @@ private struct ReadyToastView: View {
                     .font(.caption2.weight(.semibold))
                 Text("· \(hotkeyLabel) pastes this")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
             }
             Text(text)
                 .font(.system(size: 12.5))
@@ -183,6 +129,7 @@ private struct ReadyToastView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(width: 330, alignment: .leading)
+        .foregroundStyle(theme.text)
         .toastBackground()
         .padding(5)
     }
@@ -194,6 +141,8 @@ private struct ToastView: View {
     let bundleID: String
     var warning: String?
 
+    @Environment(\.markerTheme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
@@ -204,13 +153,13 @@ private struct ToastView: View {
                     .font(.caption2.weight(.semibold))
                 Text("· captured from")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
                 Image(nsImage: AppIcons.icon(for: bundleID))
                     .resizable()
                     .frame(width: 12, height: 12)
                 Text(appName)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
             }
             Text(text)
                 .font(.system(size: 12.5))
@@ -220,25 +169,39 @@ private struct ToastView: View {
             if let warning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(theme.accent)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(width: 330, alignment: .leading)
+        .foregroundStyle(theme.text)
         .toastBackground()
         .padding(5)
     }
 }
 
 private extension View {
-    @ViewBuilder
     func toastBackground() -> some View {
-        if #available(macOS 26.0, *) {
-            glassEffect(in: .rect(cornerRadius: 14))
-        } else {
-            background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.separator.opacity(0.5)))
-        }
+        modifier(ToastBackgroundModifier())
+    }
+}
+
+private struct ToastBackgroundModifier: ViewModifier {
+    @Environment(\.markerTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(theme.chip)
+            }
+            .overlay {
+                if let border = theme.border {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(border, lineWidth: 1)
+                }
+            }
+            .shadow(color: .black.opacity(0.3), radius: 9, y: 3)
     }
 }

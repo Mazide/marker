@@ -5,6 +5,7 @@ struct HistoryView: View {
     let onDismiss: () -> Void
 
     private var model = AppModel.shared
+    @Environment(\.markerTheme) private var theme
     @Environment(\.openSettings) private var openSettingsAction
     @State private var searchText = ""
     @State private var filterBundleID: String?
@@ -38,8 +39,10 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 0) {
             panelHeader
             Divider()
+                .overlay(theme.border ?? theme.text.opacity(0.14))
             content
             Divider()
+                .overlay(theme.border ?? theme.text.opacity(0.14))
             footer
         }
         .frame(width: 560)
@@ -47,13 +50,17 @@ struct HistoryView: View {
         // its own chrome.
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(theme.chip)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.separator.opacity(0.5))
+            if let border = theme.border {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(border, lineWidth: 1)
+            }
         }
+        .foregroundStyle(theme.text)
+        .tint(theme.accent)
         .onAppear {
             // Typing right after ⇧⌥V should land in search. The async hop
             // waits out the popover window becoming key; setting the focus
@@ -106,8 +113,6 @@ struct HistoryView: View {
         return .handled
     }
 
-    static let accent = Color(red: 0.91, green: 0.46, blue: 0.05)
-
     // MARK: - Header (search + filter is the header)
 
     /// Spotlight-style header: the search field IS the header — no pill,
@@ -116,7 +121,7 @@ struct HistoryView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.dim)
             TextField("Search selections", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 18, weight: .light))
@@ -127,7 +132,7 @@ struct HistoryView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.dim)
                 }
                 .buttonStyle(.plain)
             }
@@ -158,7 +163,11 @@ struct HistoryView: View {
                   ? "line.3.horizontal.decrease.circle"
                   : "line.3.horizontal.decrease.circle.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(filterBundleID == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Self.accent))
+                .foregroundStyle(
+                    filterBundleID == nil
+                        ? AnyShapeStyle(theme.dim)
+                        : AnyShapeStyle(theme.accent)
+                )
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -251,7 +260,7 @@ struct HistoryView: View {
                             Text(dayTitle(group.day).uppercased())
                                 .font(.system(size: 10, weight: .semibold))
                                 .tracking(0.6)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(theme.dim.opacity(0.65))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 // Aligns with the row's app icon: 6pt pill
                                 // inset + 8pt content inset.
@@ -280,7 +289,7 @@ struct HistoryView: View {
         HStack {
             Text("↩ pastes · \(model.pasteHotkey.label) repeats it · right-click copies")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(theme.dim.opacity(0.65))
             Spacer()
             Menu {
                 Button("Settings…") {
@@ -300,7 +309,7 @@ struct HistoryView: View {
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
                     // The glyph is 13pt; the row is short, so the button
                     // needs its own hit area to be comfortably clickable.
                     .frame(width: 28, height: 24)
@@ -326,26 +335,28 @@ private struct EmptyState: View {
     var actionTitle: LocalizedStringKey?
     var action: (() -> Void)?
 
+    @Environment(\.markerTheme) private var theme
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(HistoryView.accent)
+                .foregroundStyle(theme.accent)
                 .frame(width: 42, height: 42)
-                .background(HistoryView.accent.opacity(0.14), in: Circle())
+                .background(theme.accent.opacity(0.14), in: Circle())
                 .padding(.bottom, 2)
             Text(title)
                 .font(.headline)
             Text(message)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.dim)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 250)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.borderedProminent)
-                    .tint(HistoryView.accent)
+                    .tint(theme.accent)
                     .controlSize(.small)
                     .padding(.top, 6)
             }
@@ -367,6 +378,7 @@ private struct HistoryRow: View {
     let onCopy: () -> Void
     let onDelete: () -> Void
 
+    @Environment(\.markerTheme) private var theme
     @State private var isHovered = false
 
     /// One shared line box: mono at 11pt sits on the same 18pt line as the
@@ -422,7 +434,7 @@ private struct HistoryRow: View {
                     .font(isCodeLike
                           ? .system(size: 11, design: .monospaced)
                           : .callout)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(theme.text)
                     .lineLimit(1)
                     .truncationMode(isCodeLike ? .middle : .tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,14 +447,14 @@ private struct HistoryRow: View {
                     Text(item.date, format: .dateTime.hour().minute())
                         .font(.caption)
                         .monospacedDigit()
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(theme.dim.opacity(0.65))
                         .opacity(showsTime && !isHovered ? 1 : 0)
 
                     HStack(spacing: 8) {
                         Button(action: onCopy) {
                             Image(systemName: "doc.on.doc.fill")
                                 .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.dim)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -451,7 +463,7 @@ private struct HistoryRow: View {
                         Button(action: onDelete) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.dim)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -471,8 +483,16 @@ private struct HistoryRow: View {
         .background {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(isSelected
-                      ? AnyShapeStyle(HistoryView.accent.opacity(0.22))
-                      : AnyShapeStyle(.quaternary))
+                      ? AnyShapeStyle(theme.accent.opacity(0.16))
+                      : AnyShapeStyle(theme.surface))
+                .opacity(isSelected || isHovered ? 1 : 0)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(
+                    isSelected ? theme.accent.opacity(0.18) : theme.text.opacity(0.07),
+                    lineWidth: 1
+                )
                 .opacity(isSelected || isHovered ? 1 : 0)
         }
         .padding(.horizontal, 6)

@@ -163,6 +163,12 @@ final class AppModel {
     @ObservationIgnored private var trustPollTimer: Timer?
     @ObservationIgnored private var retentionTimer: Timer?
     @ObservationIgnored private var tapHealthTimer: Timer?
+    /// Mouse-up (or shift-click) point waiting for the capture engine to
+    /// confirm that the gesture really selected text.
+    @ObservationIgnored private var captureActionAnchor: (point: NSPoint, date: Date)?
+    /// Cursor point for a gesture paste. PasteEngine may wait for modifiers,
+    /// so show feedback only when it reaches the actual paste operation.
+    @ObservationIgnored private var pendingPasteFeedbackAnchor: NSPoint?
 
     // Domain layer
     @ObservationIgnored private var engine: CaptureEngine!
@@ -187,19 +193,31 @@ final class AppModel {
         axMonitor.onSelectionChanged = { [weak self] in
             self?.engine.axSelectionChanged()
         }
-        axMonitor.onKeyDown = { [weak self] isIntent, isTyping in
+        axMonitor.onKeyDown = { [weak self] isIntent, isTyping, isMarkerSynthetic in
+            if !isMarkerSynthetic {
+                SelectionActionPresenter.shared.dismiss()
+            }
             self?.engine.keyDown(isSelectionIntent: isIntent, isPlainTyping: isTyping)
         }
         engine.retractionEnabled = retractEditedEnabled
         engine.richViaCopyEnabled = richCopyEnabled
         engine.excludedBundleIDs = Set(excludedBundleIDs)
         pasteEngine.onPaste = { [weak self] in
-            self?.engine.externalPasteOccurred()
+            guard let self else { return }
+            self.engine.externalPasteOccurred()
+            guard let anchor = self.pendingPasteFeedbackAnchor else { return }
+            self.pendingPasteFeedbackAnchor = nil
+            SelectionActionPresenter.shared.showPasteConfirmation(at: anchor)
         }
-        mouseMonitor.onMouseDown = { [weak self] shiftClick in
+        mouseMonitor.onMouseDown = { [weak self] shiftClick, point in
+            SelectionActionPresenter.shared.dismiss()
+            if shiftClick {
+                self?.captureActionAnchor = (point, Date())
+            }
             self?.engine.mouseDown(shiftClick: shiftClick)
         }
-        mouseMonitor.onSelectionGesture = { [weak self] in
+        mouseMonitor.onSelectionGesture = { [weak self] point in
+            self?.captureActionAnchor = (point, Date())
             self?.engine.selectionGesture()
         }
         engine.onCapture = { [weak self] content, app, _ in
@@ -215,7 +233,7 @@ final class AppModel {
                 HistoryPanelPresenter.shared.toggle()
             }
         }
-        middleClickTap.onMiddleClick = { [weak self] point in
+        middleClickTap.onMiddleClick = { [weak self] _ in
             guard let self else { return false }
             guard self.middleClickPasteEnabled, self.axTrusted else {
                 diagLog("middle-click ignored: enabled=\(self.middleClickPasteEnabled) axTrusted=\(self.axTrusted)")
@@ -226,11 +244,10 @@ final class AppModel {
                 diagLog("middle-click ignored: nothing to paste (PastePolicy)")
                 return false
             }
-            _ = point
             // Paste into the current focus, same as ⌥V.
+            self.pendingPasteFeedbackAnchor = NSEvent.mouseLocation
             self.pasteEngine.pasteIntoActiveApp(item.content)
             diagLog("middle-click pasted \(item.text.count) chars")
-            ToastPresenter.shared.showPaste(text: item.text, source: .middleClick)
             return true
         }
         threeFingerClickTap.fingersTouching = { [weak self] in
@@ -241,8 +258,8 @@ final class AppModel {
                   self.shouldPasteAtCursor(input: "three-finger click"),
                   let item = self.itemToPaste()
             else { return false }
+            self.pendingPasteFeedbackAnchor = NSEvent.mouseLocation
             self.pasteEngine.pasteIntoActiveApp(item.content)
-            ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerClick)
             return true
         }
         trackpadTap.onThreeFingerDoubleTap = { [weak self] in
@@ -250,8 +267,8 @@ final class AppModel {
                   self.shouldPasteAtCursor(input: "three-finger double tap", isTap: true),
                   let item = self.itemToPaste()
             else { return }
+            self.pendingPasteFeedbackAnchor = NSEvent.mouseLocation
             self.pasteEngine.pasteIntoActiveApp(item.content)
-            ToastPresenter.shared.showPaste(text: item.text, source: .threeFingerDoubleTap)
         }
         if threeFingerPasteMode != .off {
             trackpadTap.start()
@@ -334,8 +351,12 @@ final class AppModel {
         pasteboard.writeString(text)
     }
 
+    func copyToClipboard(_ content: RichText) {
+        pasteboard.writeContent(content)
+    }
+
     func copyToClipboard(_ item: SelectionItem) {
-        pasteboard.writeContent(item.content)
+        copyToClipboard(item.content)
     }
 
     /// The entry the paste triggers use when the user picked one in the
@@ -401,26 +422,40 @@ final class AppModel {
 
     private func ingest(content: RichText, app: SourceApp) {
         // The clipboard stays the user's: captures land in history only,
-        // and reach the pasteboard solely through an explicit copy in the
-        // popover.
+        // and reach the pasteboard solely through an explicit Copy action.
         if skipSecretsEnabled, SecretDetector.looksSecret(content.plain) {
             markerLog.info("skipped a selection that looks like a secret")
             return
         }
 
-        let isNew = history.items.first?.text != content.plain
         let saved = history.push(content, app: app)
+        let actionAnchor = takeCaptureActionAnchor()
         // Selecting something new supersedes a popover pick — the latest
         // selection is what the user means to paste now.
         pickedPasteItemID = nil
-        if isNew, toastEnabled {
+        if toastEnabled, let actionAnchor {
+            SelectionActionPresenter.shared.show(at: actionAnchor) { [weak self] in
+                self?.copyToClipboard(content)
+            }
+        }
+        if !saved, toastEnabled {
             ToastPresenter.shared.show(
                 text: content.plain,
                 appName: app.name,
                 bundleID: app.bundleID,
-                warning: saved ? nil : "Couldn't save to history"
+                warning: "Couldn't save to history"
             )
         }
+    }
+
+    /// Captures normally settle within 0.15–0.9s. Anything older belongs to
+    /// an abandoned gesture and must not make a later capture appear in the
+    /// wrong place.
+    private func takeCaptureActionAnchor() -> NSPoint? {
+        guard let anchor = captureActionAnchor else { return nil }
+        captureActionAnchor = nil
+        guard Date().timeIntervalSince(anchor.date) < 2 else { return nil }
+        return anchor.point
     }
 
     /// What ⌥V and the click gestures should paste — usually the newest

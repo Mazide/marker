@@ -1,4 +1,4 @@
-import { captureToast, pasteToast, readyToast } from './components.js';
+import { captureToast, readyToast } from './components.js';
 
 const SAMPLE = 'The best interface is the one you never notice until it quietly does the right thing.';
 
@@ -19,17 +19,6 @@ export const CapturedWithWarning = {
       bundleID: 'com.apple.Terminal',
       warning: 'Looks like a secret — not saved to history',
     }),
-};
-
-export const PastedViaGesture = {
-  args: { source: 'threeFingerClick' },
-  argTypes: {
-    source: {
-      control: 'select',
-      options: ['threeFingerClick', 'threeFingerDoubleTap', 'middleClick'],
-    },
-  },
-  render: (args) => pasteToast({ text: args.text, source: args.source }),
 };
 
 export const ReadyToPaste = {

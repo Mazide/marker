@@ -13,6 +13,7 @@ struct MarkerApp: App {
         // hotkey both open the same centered history panel.
         Settings {
             SettingsView()
+                .markerThemed()
         }
     }
 }

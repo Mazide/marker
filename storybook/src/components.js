@@ -2,6 +2,7 @@
  * DOM builders mirroring the SwiftUI views one-to-one.
  * HistoryView.swift → popover / row / emptyState / footer
  * ToastPresenter.swift → toasts
+ * SelectionActionPresenter.swift → selectionAction / pasteConfirmation
  */
 
 // ---------- helpers ----------
@@ -47,6 +48,10 @@ const SVG = {
     '<circle cx="8" cy="4" r="2.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 4 v5.5 M6 9 v-1 a1 1 0 0 1 2 0 M10 9.5 V8 a1 1 0 0 1 2 0 v2.8 c0 1.8-1.2 3-3 3 -1.3 0-2-0.5-2.8-1.6 l-1.4-2 a0.9 0.9 0 0 1 1.5-1 Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>',
   computermouse:
     '<rect x="4" y="1.5" width="8" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="8" y1="3.5" x2="8" y2="6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  docOnDoc:
+    '<rect x="5.5" y="1.5" width="8" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.5" y="4.5" width="8" height="10" rx="2" fill="var(--material-opaque, #f0f0f0)" stroke="currentColor" stroke-width="1.4"/>',
+  checkmark:
+    '<path d="M2.8 8.6 L6.3 12 L13.2 4.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
 export function icon(name, size = 16) {
@@ -304,12 +309,39 @@ function toastShell(headerChildren, text, warning) {
   return root;
 }
 
-const markerIcon = () => {
-  const span = el('span', 'app-icon-glyph', '');
-  span.style.cssText = 'width:14px;height:14px;background:linear-gradient(180deg,#f9a825,#e8750d);position:relative;';
-  span.innerHTML = '<span style="position:absolute;inset:4px 2px;background:rgba(255,255,255,.92);border-radius:1.5px;"></span>';
-  return el('span', 'app-icon', [span]);
-};
+/** Real full-color Marker app icon, inlined from assets/icon.svg (512 viewBox). */
+export function markerAppIcon(size = 16) {
+  const span = el('span', 'icon');
+  span.innerHTML =
+    `<svg width="${size}" height="${size}" viewBox="0 0 512 512">` +
+    '<defs><linearGradient id="mk-bg" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#26221c"/><stop offset="1" stop-color="#171512"/></linearGradient>' +
+    '<linearGradient id="mk-hl" x1="0" y1="0" x2="1" y2="0">' +
+    '<stop offset="0" stop-color="#f5a623"/><stop offset="1" stop-color="#e8760c"/></linearGradient></defs>' +
+    '<rect width="512" height="512" rx="116" fill="url(#mk-bg)"/>' +
+    '<rect x="88" y="186" width="336" height="140" rx="34" fill="url(#mk-hl)"/>' +
+    '<g fill="#f3efe8"><rect x="312" y="96" width="36" height="320" rx="18"/>' +
+    '<rect x="266" y="96" width="128" height="30" rx="15"/>' +
+    '<rect x="266" y="386" width="128" height="30" rx="15"/></g></svg>';
+  return span;
+}
+
+/** Monochrome template Marker icon (assets/menubar-icon.svg), fills currentColor. */
+export function markerTemplateIcon(size = 16) {
+  const span = el('span', 'icon');
+  span.innerHTML =
+    `<svg width="${size}" height="${size}" viewBox="0 0 36 36">` +
+    '<defs><mask id="mk-gap"><rect width="36" height="36" fill="white"/>' +
+    '<rect x="22.5" y="3" width="9" height="30" rx="4.5" fill="black"/></mask></defs>' +
+    '<g fill="currentColor"><rect x="2" y="12.5" width="26" height="11" rx="4" mask="url(#mk-gap)"/>' +
+    '<rect x="25.5" y="5" width="3" height="26" rx="1.5"/>' +
+    '<rect x="21.5" y="4" width="11" height="2.6" rx="1.3"/>' +
+    '<rect x="21.5" y="29.4" width="11" height="2.6" rx="1.3"/></g></svg>';
+  return span;
+}
+
+/** Legacy alias: toast/badge slots now carry the real app icon. */
+export const markerIcon = (size = 14) => el('span', 'app-icon', [markerAppIcon(size)]);
 
 export function captureToast({ text, bundleID = 'com.apple.Safari', warning = null } = {}) {
   return toastShell(
@@ -325,27 +357,60 @@ export function captureToast({ text, bundleID = 'com.apple.Safari', warning = nu
   );
 }
 
-export function pasteToast({ text, source = 'threeFingerClick' } = {}) {
-  const labels = {
-    threeFingerClick: 'three-finger click',
-    threeFingerDoubleTap: 'three-finger double tap',
-    middleClick: 'middle-click',
-  };
-  return toastShell(
-    [
-      markerIcon(),
-      el('span', 'app-name', 'Marker'),
-      '· pasted via',
-      icon(source === 'middleClick' ? 'computermouse' : 'handTap', 11),
-      labels[source],
-    ],
-    text,
-  );
-}
-
 export function readyToast({ text, hotkeyLabel = '⇧⌘V' } = {}) {
   return toastShell(
     [markerIcon(), el('span', 'app-name', 'Marker'), `· ${hotkeyLabel} pastes this`],
     text,
   );
+}
+
+// ---------- selection action (SelectionActionPresenter.swift) ----------
+
+/** checkmark.circle.fill badge — white check on systemGreen. */
+function checkBadge(size = 9) {
+  const span = el('span', 'check-badge');
+  span.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 16 16"><circle cx="8" cy="8" r="8" fill="var(--green, #28cd41)"/><path d="M4.6 8.4 L7 10.8 L11.4 5.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return span;
+}
+
+/** Marker app icon with the green "saved" badge, bottom-trailing. */
+export function savedBadge({ iconSize = 16, badgeSize = 9, frame = 18 } = {}) {
+  const wrap = el('span', 'saved-badge', [markerIcon(iconSize), checkBadge(badgeSize)]);
+  wrap.style.width = `${frame}px`;
+  wrap.style.height = `${frame}px`;
+  wrap.title = 'Saved to Marker';
+  return wrap;
+}
+
+/**
+ * Floating pill beside the selection mouse-up point.
+ * `onCopy` fires once when the copy button is clicked (state flips to check).
+ */
+export function selectionAction({ copied = false, onCopy = null } = {}) {
+  const root = el('div', 'selection-action', [savedBadge(), el('span', 'divider')]);
+
+  const done = el('span', 'copied-check', [icon('checkmark', 13)]);
+  done.title = 'Copied to Clipboard';
+
+  if (copied) {
+    root.append(done);
+  } else {
+    const copy = el('button', 'copy-button', [icon('docOnDoc', 15)]);
+    copy.title = 'Copy to Clipboard';
+    copy.addEventListener('click', () => {
+      copy.replaceWith(done);
+      onCopy?.();
+    });
+    root.append(copy);
+  }
+  return root;
+}
+
+/** Icon-only confirmation shown above the cursor after a gesture paste. */
+export function pasteConfirmation() {
+  const root = el('div', 'selection-action paste-confirmation', [
+    savedBadge({ iconSize: 18, badgeSize: 10, frame: 22 }),
+  ]);
+  root.querySelector('.saved-badge').title = 'Pasted with Marker';
+  return root;
 }

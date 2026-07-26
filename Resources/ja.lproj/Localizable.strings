@@ -20,7 +20,9 @@
 "Physical click" = "クリック";
 "Double tap" = "ダブルタップ";
 "Interface" = "インターフェイス";
+"Appearance" = "外観";
 "Show a popup on capture" = "キャプチャ時にポップアップを表示";
+"Offers Copy beside the pointer without changing the clipboard automatically." = "クリップボードを自動的に変更せず、ポインタの横にコピー操作を表示します。";
 "Start at login" = "ログイン時に起動";
 "History" = "履歴";
 "Remove every captured selection" = "キャプチャした選択をすべて削除";
@@ -44,6 +46,12 @@
 "Nothing selected like that. Try fewer letters or another app filter." = "該当する選択はありません。文字数を減らすか、別のアプリフィルタをお試しください。";
 "⌥V pastes latest" = "⌥V で最新をペースト";
 "Copy" = "コピー";
+"Copied" = "コピー済み";
+"Saved" = "保存済み";
+"Saved to Marker" = "Markerに保存済み";
+"Copy to Clipboard" = "クリップボードにコピー";
+"Copied to Clipboard" = "クリップボードにコピー済み";
+"Pasted with Marker" = "Markerでペースト済み";
 "Delete" = "削除";
 "Copies this selection" = "この選択をコピーします";
 

@@ -6,7 +6,11 @@ import ApplicationServices
 /// selections on demand. All decisions live in CaptureEngine.
 final class AXSelectionMonitor: NSObject, SelectionReading {
     var onSelectionChanged: (() -> Void)?
-    var onKeyDown: ((_ isSelectionIntent: Bool, _ isPlainTyping: Bool) -> Void)?
+    var onKeyDown: ((
+        _ isSelectionIntent: Bool,
+        _ isPlainTyping: Bool,
+        _ isMarkerSynthetic: Bool
+    ) -> Void)?
 
     private var observer: AXObserver?
     private var appElement: AXUIElement?
@@ -37,7 +41,8 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
                     && !flags.contains(.control)
                     && !isArrow
                     && !isSelectionIntent
-                self?.onKeyDown?(isSelectionIntent, isPlainTyping)
+                let isMarkerSynthetic = CGEventKeySynthesizer.isMarkerSynthetic(event.cgEvent)
+                self?.onKeyDown?(isSelectionIntent, isPlainTyping, isMarkerSynthetic)
             }
         }
         attach(to: NSWorkspace.shared.frontmostApplication)

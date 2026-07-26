@@ -13,6 +13,8 @@ struct SettingsView: View {
 
 private struct GeneralSettingsView: View {
     private var model = AppModel.shared
+    @AppStorage("pillTheme") private var pillTheme = PillThemeChoice.ink.rawValue
+    @Environment(\.markerTheme) private var theme
     @State private var autoUpdates = AppModel.shared.autoUpdatesEnabled
     @State private var cliStatus = CLIInstaller.Status.missing
 
@@ -32,6 +34,9 @@ private struct GeneralSettingsView: View {
             form
             footer
         }
+        .foregroundStyle(theme.text)
+        .tint(theme.accent)
+        .background(theme.chip)
     }
 
     private var form: some View {
@@ -47,6 +52,7 @@ private struct GeneralSettingsView: View {
                         model.autoUpdatesEnabled = newValue
                     }
             }
+            .listRowBackground(theme.surface)
 
             Section("Capture") {
                 SettingToggle(
@@ -66,6 +72,7 @@ private struct GeneralSettingsView: View {
                     isOn: Bindable(model).richCopyEnabled
                 )
             }
+            .listRowBackground(theme.surface)
 
             Section {
                 ForEach(model.excludedBundleIDs, id: \.self) { bundleID in
@@ -79,7 +86,7 @@ private struct GeneralSettingsView: View {
                             model.excludedBundleIDs.removeAll { $0 == bundleID }
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.dim)
                         }
                         .buttonStyle(.plain)
                         .help("Stop ignoring")
@@ -91,8 +98,9 @@ private struct GeneralSettingsView: View {
             } footer: {
                 Text("Selections in these apps are never captured — no history entry, no ⌘C fallback.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
             }
+            .listRowBackground(theme.surface)
 
             Section("Shortcuts") {
                 HotkeyRecorder(
@@ -108,6 +116,7 @@ private struct GeneralSettingsView: View {
                     isTaken: { $0 == model.pasteHotkey }
                 )
             }
+            .listRowBackground(theme.surface)
 
             Section("Paste") {
                 SettingToggle(
@@ -124,11 +133,12 @@ private struct GeneralSettingsView: View {
                         Text("Three-finger paste")
                         Text("Middle-click for the trackpad: pastes the latest selection. Experimental.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.dim)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
+            .listRowBackground(theme.surface)
 
             Section("Command Line") {
                 LabeledContent {
@@ -142,22 +152,73 @@ private struct GeneralSettingsView: View {
                             Text("Terminal command")
                             if cliStatus == .installed {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(theme.success)
                             }
                         }
                         Text(cliCaption)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.dim)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .onAppear { cliStatus = CLIInstaller.status() }
             }
+            .listRowBackground(theme.surface)
 
             Section("Interface") {
-                Toggle("Show a popup on capture", isOn: Bindable(model).toastEnabled)
+                SettingToggle(
+                    "Show a popup on capture",
+                    caption: "Offers Copy beside the pointer without changing the clipboard automatically.",
+                    isOn: Bindable(model).toastEnabled
+                )
                 Toggle("Start at login", isOn: Bindable(model).launchAtLogin)
             }
+            .listRowBackground(theme.surface)
+
+            Section("Appearance") {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(PillThemeChoice.allCases) { choice in
+                            Button {
+                                pillTheme = choice.rawValue
+                            } label: {
+                                VStack(spacing: 4) {
+                                    PillThemePreview(choice: choice)
+                                    Text(verbatim: choice.displayName)
+                                        .font(.caption2)
+                                        .foregroundStyle(theme.text)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 5)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(
+                                            pillTheme == choice.rawValue
+                                                ? theme.accent.opacity(0.12)
+                                                : .clear
+                                        )
+                                }
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .strokeBorder(
+                                            pillTheme == choice.rawValue
+                                                ? theme.accent
+                                                : theme.dim.opacity(0.16),
+                                            lineWidth: pillTheme == choice.rawValue ? 1.5 : 1
+                                        )
+                                }
+                                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(verbatim: choice.displayName))
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .listRowBackground(theme.surface)
 
             Section("Troubleshooting") {
                 SettingToggle(
@@ -166,6 +227,7 @@ private struct GeneralSettingsView: View {
                     isOn: Bindable(model).diagLogEnabled
                 )
             }
+            .listRowBackground(theme.surface)
 
             Section("History") {
                 Picker("Keep history for", selection: Bindable(model).historyRetentionDays) {
@@ -181,8 +243,11 @@ private struct GeneralSettingsView: View {
                     .disabled(model.history.items.isEmpty)
                 }
             }
+            .listRowBackground(theme.surface)
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(theme.chip)
     }
 
     /// Running regular apps first — the app someone wants to ignore is
@@ -253,6 +318,7 @@ private struct HotkeyRecorder: View {
 
     @State private var isRecording = false
     @State private var monitor: Any?
+    @Environment(\.markerTheme) private var theme
 
     init(
         _ title: LocalizedStringKey,
@@ -276,7 +342,7 @@ private struct HotkeyRecorder: View {
                         Image(systemName: "arrow.uturn.backward")
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
                     .help("Reset to \(defaultCombo.label)")
                 }
                 Button(isRecording ? "Type shortcut…" : combo.label) {
@@ -355,6 +421,7 @@ private struct SettingToggle: View {
     let detail: LocalizedStringKey?
     @Binding var isOn: Bool
     @State private var showingDetail = false
+    @Environment(\.markerTheme) private var theme
 
     init(
         _ title: LocalizedStringKey,
@@ -378,22 +445,24 @@ private struct SettingToggle: View {
                             showingDetail = true
                         } label: {
                             Image(systemName: "info.circle")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.dim)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("More about this setting")
                         .popover(isPresented: $showingDetail, arrowEdge: .bottom) {
                             Text(detail)
                                 .font(.callout)
+                                .foregroundStyle(theme.text)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(width: 280)
                                 .padding()
+                                .background(theme.chip)
                         }
                     }
                 }
                 Text(caption)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.dim)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

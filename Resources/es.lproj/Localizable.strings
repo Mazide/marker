@@ -20,7 +20,9 @@
 "Physical click" = "Clic físico";
 "Double tap" = "Doble toque";
 "Interface" = "Interfaz";
+"Appearance" = "Apariencia";
 "Show a popup on capture" = "Mostrar un aviso al capturar";
+"Offers Copy beside the pointer without changing the clipboard automatically." = "Ofrece Copiar junto al puntero sin cambiar automáticamente el portapapeles.";
 "Start at login" = "Abrir al iniciar sesión";
 "History" = "Historial";
 "Remove every captured selection" = "Eliminar todas las selecciones capturadas";
@@ -44,6 +46,12 @@
 "Nothing selected like that. Try fewer letters or another app filter." = "No se seleccionó nada así. Prueba con menos letras u otro filtro de app.";
 "⌥V pastes latest" = "⌥V pega la última";
 "Copy" = "Copiar";
+"Copied" = "Copiado";
+"Saved" = "Guardado";
+"Saved to Marker" = "Guardado en Marker";
+"Copy to Clipboard" = "Copiar al portapapeles";
+"Copied to Clipboard" = "Copiado al portapapeles";
+"Pasted with Marker" = "Pegado con Marker";
 "Delete" = "Eliminar";
 "Copies this selection" = "Copia esta selección";
 
