@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Marker: select text, paste it anywhere</title>
-  <meta name="description" content="Tiny macOS menu bar app: selected text is captured automatically into a searchable history, and Option+V pastes the latest. Free, open source, notarized.">
+  <title>Marker: a second clipboard for macOS</title>
+  <meta name="description" content="Select text to save it, then paste with middle-click, a three-finger tap, or Option+V. Free and open source.">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <style>
     :root {
@@ -88,18 +88,6 @@
       background: #e8930c;
     }
 
-    code {
-      font-family: ui-monospace, "SF Mono", Menlo, monospace;
-      font-size: 13.5px;
-      color: #33302b;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      code {
-        color: #e6dfd3;
-      }
-    }
-
     kbd {
       font-family: inherit;
       font-size: 14px;
@@ -139,14 +127,6 @@
       background: transparent;
       color: #181714;
       border: 1.5px solid #c9c1b2;
-    }
-
-    .demo {
-      display: block;
-      width: 100%;
-      border-radius: 12px;
-      margin: 0 0 24px;
-      box-shadow: 0 6px 18px rgba(24, 23, 20, 0.18);
     }
 
     .meta {
@@ -212,30 +192,21 @@
       <img src="/icon.svg" alt="">
       <div>
         <h1>Marker</h1>
-        <p class="tagline">Select text. Paste it anywhere.</p>
+        <p class="tagline">A second clipboard for selected text.</p>
       </div>
     </div>
-    <video class="demo" src="/demo.mp4" autoplay muted loop playsinline aria-label="Demo: selecting text in Xcode, pasting it into Notes with a tap"></video>
     <ul class="how">
       <li>
-        <b>Everywhere on your Mac.</b>
-        Native apps, browsers, Telegram, Slack, terminals. No extension, no per-app setup.
+        <b>Select.</b>
+        Marker saves selected text to its own buffer without touching your clipboard. Want it there too? Click the Copy button beside the selection.
       </li>
       <li>
-        <b>Selected is saved. Your clipboard is yours.</b>
-        Every selection lands in Marker's own buffer. A small Copy action appears beside the pointer when you want to promote it to the system clipboard — otherwise your clipboard stays untouched.
+        <b>Find it later.</b>
+        Every selection stays in a searchable history.
       </li>
       <li>
-        <b>Paste without the keyboard.</b>
-        <kbd>⌥ V</kbd> pastes the latest selection, <kbd>⇧ ⌥ V</kbd> opens searchable history in a Spotlight-style panel — arrows plus <kbd>↩</kbd> paste an entry straight into the field you were typing in. Or turn on middle-click paste — three-finger click on a trackpad — and drop it straight into any text field, X11 style. Shortcuts are yours to remap.
-      </li>
-      <li>
-        <b>Nothing gets lost.</b>
-        Every selection stays in the menu bar: search it, browse it by app, or find what you selected last week. API keys and tokens are never saved.
-      </li>
-      <li>
-        <b>Scriptable, three ways.</b>
-        A <kbd>marker</kbd> CLI for pipes (<code>marker latest | jq</code>), Shortcuts/Spotlight/Siri actions, and <code>marker://</code> URLs for launchers and macros. Your selections become plumbing.
+        <b>Paste anywhere.</b>
+        Middle-click with a mouse, three-finger tap on a trackpad, or press <kbd>⌥ V</kbd>.
       </li>
     </ul>
     <div class="buttons">
@@ -245,14 +216,13 @@
       </a>
       <a class="btn secondary" href="https://github.com/Mazide/marker">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.4.6.1.82-.26.82-.58v-2.02c-3.34.72-4.04-1.6-4.04-1.6-.55-1.4-1.34-1.76-1.34-1.76-1.08-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.9 1.23 3.22 0 4.6-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.57C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
-        GitHub
+        Open source
       </a>
     </div>
-    <div class="meta">0.13.1 · macOS 14+ · Free · Notarized</div>
+    <div class="meta">0.13.1 · macOS 14+ · Free &amp; open source</div>
     <p class="quiet">
       Needs Accessibility permission. Nothing leaves your Mac
-      (<a href="/privacy/">privacy</a>). MIT-licensed.
-      Questions: <a href="mailto:nikdemm@gmail.com?subject=Marker">email</a> or GitHub issues.
+      (<a href="/privacy/">privacy</a>).
     </p>
   </main>
 </body>
