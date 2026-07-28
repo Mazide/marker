@@ -41,6 +41,14 @@
 "Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker reads selections through macOS Accessibility. Nothing leaves your Mac.";
 "Open System Settings" = "Open System Settings";
 "Nothing here yet" = "Nothing here yet";
+"History is temporarily unavailable" = "History is temporarily unavailable";
+"Your saved data was left untouched." = "Your saved data was left untouched.";
+"Retry" = "Retry";
+"Queued safely — retrying history" = "Queued safely — retrying history";
+"Couldn't save to history" = "Couldn't save to history";
+"Search selections" = "Search selections";
+"Select text in any app — it lands here, ready to copy or paste." = "Select text in any app — it lands here, ready to copy or paste.";
+"· captured from" = "· captured from";
 "Select text in any app — it lands here, already copied." = "Select text in any app — it lands here, already copied.";
 "No matches" = "No matches";
 "Nothing selected like that. Try fewer letters or another app filter." = "Nothing selected like that. Try fewer letters or another app filter.";

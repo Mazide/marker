@@ -41,6 +41,14 @@
 "Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker 通过 macOS 辅助功能读取所选内容。任何数据都不会离开你的 Mac。";
 "Open System Settings" = "打开系统设置";
 "Nothing here yet" = "这里还没有内容";
+"History is temporarily unavailable" = "历史记录暂时不可用";
+"Your saved data was left untouched." = "已保存的数据未被更改。";
+"Retry" = "重试";
+"Queued safely — retrying history" = "已安全排队 — 正在重试写入历史记录";
+"Couldn't save to history" = "无法保存到历史记录";
+"Search selections" = "搜索所选内容";
+"Select text in any app — it lands here, ready to copy or paste." = "在任意应用中选中文本，它会显示在这里，可供复制或粘贴。";
+"· captured from" = "· 捕获自";
 "Select text in any app — it lands here, already copied." = "在任意应用中选中文本，它会出现在这里，并且已拷贝好。";
 "No matches" = "无匹配结果";
 "Nothing selected like that. Try fewer letters or another app filter." = "没有这样的所选内容。试试更短的关键词或其他应用过滤。";

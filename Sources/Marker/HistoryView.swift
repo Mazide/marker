@@ -213,6 +213,14 @@ struct HistoryView: View {
                 actionTitle: "Open System Settings",
                 action: { model.openAccessibilitySettings() }
             )
+        } else if !model.history.isReadable, model.history.items.isEmpty {
+            EmptyState(
+                icon: "exclamationmark.triangle.fill",
+                title: "History is temporarily unavailable",
+                message: "Your saved data was left untouched.",
+                actionTitle: "Retry",
+                action: { model.history.refresh() }
+            )
         } else if model.history.items.isEmpty {
             EmptyState(
                 icon: "cursorarrow.motionlines",
@@ -505,8 +513,10 @@ private struct HistoryRow: View {
             Button("Delete", role: .destructive, action: onDelete)
         }
         // The app name is gone from the visuals, so keep it in the label.
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(snippet), \(item.appName)")
         .accessibilityHint("Makes this what the paste hotkey inserts")
+        .accessibilityAction(named: "Copy") { onCopy() }
+        .accessibilityAction(named: "Delete") { onDelete() }
     }
 }

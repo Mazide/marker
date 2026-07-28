@@ -140,6 +140,74 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(db.count(), 0)
     }
 
+    func testFailedInsertSurvivesRefreshAndRetriesWhenDatabaseRecovers() {
+        db.failInserts = true
+        XCTAssertFalse(store.push(text: "pending", app: telegram))
+
+        store.refresh()
+        XCTAssertEqual(store.items.map(\.text), ["pending"],
+                       "a successful empty read must not erase a pending capture")
+        XCTAssertTrue(store.hasPendingWrites)
+
+        db.failInserts = false
+        store.refresh()
+
+        XCTAssertEqual(store.items.map(\.text), ["pending"])
+        XCTAssertEqual(db.count(), 1)
+        XCTAssertFalse(store.hasPendingWrites)
+    }
+
+    func testReadFailurePreservesLoadedHistoryInsteadOfShowingEmptyState() {
+        store.push(text: "durable", app: telegram)
+        db.failReads = true
+
+        store.refresh()
+
+        XCTAssertEqual(store.items.map(\.text), ["durable"])
+        XCTAssertFalse(store.isReadable)
+
+        db.failReads = false
+        store.refresh()
+        XCTAssertTrue(store.isReadable)
+    }
+
+    func testFailedRefinementDoesNotDeleteDurablePredecessor() {
+        store.push(text: "hello", app: telegram)
+        let durableID = db.rows[0].id
+        clock = clock.addingTimeInterval(2)
+        db.failInserts = true
+
+        XCTAssertFalse(store.push(text: "hello world", app: telegram))
+
+        XCTAssertEqual(db.rows.map(\.text), ["hello"])
+        XCTAssertEqual(db.rows.first?.id, durableID)
+        XCTAssertEqual(store.items.map(\.text), ["hello world"])
+    }
+
+    func testRecoveryQueueSurvivesRelaunchAndReplaysCapture() throws {
+        let recoveryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("marker-recovery-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: recoveryURL) }
+
+        db.failInserts = true
+        var firstLaunch: HistoryStore? = HistoryStore(
+            db: db, recoveryURL: recoveryURL, now: { self.clock }
+        )
+        XCTAssertFalse(firstLaunch?.push(text: "survives update", app: telegram) ?? true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryURL.path))
+        firstLaunch = nil
+
+        db.failInserts = false
+        let relaunched = HistoryStore(
+            db: db, recoveryURL: recoveryURL, now: { self.clock }
+        )
+
+        XCTAssertEqual(relaunched.items.map(\.text), ["survives update"])
+        XCTAssertEqual(db.count(), 1)
+        XCTAssertFalse(relaunched.hasPendingWrites)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: recoveryURL.path))
+    }
+
     func testPushNoOpIsNotAFailure() {
         XCTAssertTrue(store.push(text: "  \n ", app: telegram), "empty selection is skipped, not failed")
         XCTAssertTrue(store.items.isEmpty)

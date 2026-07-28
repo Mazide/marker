@@ -53,6 +53,51 @@ final class SelectionActionPresenterTests: XCTestCase {
         XCTAssertLessThanOrEqual(frame.maxY, screen.maxY - 6)
     }
 
+    func testShadowInsetKeepsVisiblePillAtAnchorGap() {
+        let inset: CGFloat = 14
+        let frame = SelectionActionPresenter.positionedFrame(
+            size: NSSize(width: 128, height: 60),
+            anchor: NSPoint(x: 400, y: 300),
+            visibleFrame: screen,
+            contentInset: inset
+        )
+
+        XCTAssertEqual(frame.minX + inset, 410)
+        XCTAssertEqual(frame.minY + inset, 310)
+    }
+
+    func testShadowInsetKeepsFlippedPillAtAnchorGap() {
+        let inset: CGFloat = 14
+        let frame = SelectionActionPresenter.positionedFrame(
+            size: NSSize(width: 128, height: 60),
+            anchor: NSPoint(x: 990, y: 780),
+            visibleFrame: screen,
+            contentInset: inset
+        )
+
+        XCTAssertEqual(frame.maxX - inset, 980)
+        XCTAssertEqual(frame.maxY - inset, 770)
+    }
+
+    func testDirectionalSettleComesFromSelectionCenter() {
+        let offset = SelectionActionPresenter.directionalSettleOffset(
+            selectionCenter: NSPoint(x: 10, y: 20),
+            anchor: NSPoint(x: 13, y: 24)
+        )
+
+        XCTAssertEqual(offset.width, -3.6, accuracy: 0.001)
+        XCTAssertEqual(offset.height, -4.8, accuracy: 0.001)
+    }
+
+    func testDirectionalSettleFallsBackFromLeftWithoutSelectionVector() {
+        let offset = SelectionActionPresenter.directionalSettleOffset(
+            selectionCenter: nil,
+            anchor: NSPoint(x: 100, y: 100)
+        )
+
+        XCTAssertEqual(offset, CGSize(width: -6, height: 0))
+    }
+
     func testPasteConfirmationUsesActionAnchorRule() {
         let frame = SelectionActionPresenter.positionedFrame(
             size: NSSize(width: 80, height: 42),

@@ -137,14 +137,23 @@ final class InMemoryHistoryDatabase: HistoryDatabase {
     private(set) var rows: [SelectionItem] = []
     /// Simulate a database that can no longer be written (locked, full, gone).
     var failInserts = false
+    /// Simulate a database read error. nil, rather than [], must propagate.
+    var failReads = false
 
     @discardableResult
-    func insert(_ item: SelectionItem) -> Bool {
+    func save(_ item: SelectionItem, deletingIDs: Set<UUID>) -> Bool {
         guard !failInserts else { return false }
-        rows.removeAll { $0.id == item.id }
+        rows.removeAll {
+            deletingIDs.contains($0.id) || $0.id == item.id || $0.text == item.text
+        }
         rows.append(item)
         rows.sort { $0.date > $1.date }
         return true
+    }
+
+    @discardableResult
+    func insert(_ item: SelectionItem) -> Bool {
+        save(item, deletingIDs: [])
     }
 
     func delete(id: UUID) { rows.removeAll { $0.id == id } }
@@ -152,12 +161,14 @@ final class InMemoryHistoryDatabase: HistoryDatabase {
     func deleteOlderThan(_ date: Date) { rows.removeAll { $0.date < date } }
     func clear() { rows = [] }
 
-    func recent(limit: Int, offset: Int) -> [SelectionItem] {
-        Array(rows.dropFirst(offset).prefix(limit))
+    func recent(limit: Int, offset: Int) -> [SelectionItem]? {
+        guard !failReads else { return nil }
+        return Array(rows.dropFirst(offset).prefix(limit))
     }
 
-    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem] {
-        rows.filter { row in
+    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem]? {
+        guard !failReads else { return nil }
+        return rows.filter { row in
             if let bundleID, row.bundleID != bundleID { return false }
             if let text,
                !row.text.lowercased().contains(text.lowercased()),
@@ -167,7 +178,8 @@ final class InMemoryHistoryDatabase: HistoryDatabase {
         .prefix(limit).map { $0 }
     }
 
-    func apps() -> [(bundleID: String, name: String)] {
+    func apps() -> [(bundleID: String, name: String)]? {
+        guard !failReads else { return nil }
         var seen = Set<String>()
         var result: [(String, String)] = []
         for row in rows where !row.bundleID.isEmpty && seen.insert(row.bundleID).inserted {
@@ -176,5 +188,8 @@ final class InMemoryHistoryDatabase: HistoryDatabase {
         return result.sorted { $0.1.lowercased() < $1.1.lowercased() }
     }
 
-    func count() -> Int { rows.count }
+    func count() -> Int? {
+        guard !failReads else { return nil }
+        return rows.count
+    }
 }

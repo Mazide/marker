@@ -57,16 +57,20 @@ protocol Scheduling: AnyObject {
 }
 
 protocol HistoryDatabase: AnyObject {
-    /// Returns false when the row could not be written (the caller decides
-    /// how loudly to fail — a capture must never pretend it was persisted).
+    /// Atomically remove superseded rows and write the replacement. Returns
+    /// false without committing any deletion when the replacement cannot be
+    /// written.
+    func save(_ item: SelectionItem, deletingIDs: Set<UUID>) -> Bool
+    /// Convenience insert for callers that do not replace an existing row.
     func insert(_ item: SelectionItem) -> Bool
     func delete(id: UUID)
     func deleteAll(text: String)
     func deleteOlderThan(_ date: Date)
     func clear()
-    func recent(limit: Int, offset: Int) -> [SelectionItem]
+    /// nil means the read failed; an empty array is a successful empty read.
+    func recent(limit: Int, offset: Int) -> [SelectionItem]?
     /// Case-insensitive search over text and app name, newest first.
-    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem]
-    func apps() -> [(bundleID: String, name: String)]
-    func count() -> Int
+    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem]?
+    func apps() -> [(bundleID: String, name: String)]?
+    func count() -> Int?
 }

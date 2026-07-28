@@ -7,8 +7,9 @@ final class MouseMonitor {
     /// location, used as the action anchor if the gesture captures text.
     var onMouseDown: ((_ shiftClick: Bool, _ point: NSPoint) -> Void)?
     /// A drag beyond a small threshold, or a double/triple click, together
-    /// with the mouse-up point beside which capture actions can appear.
-    var onSelectionGesture: ((_ point: NSPoint) -> Void)?
+    /// with the mouse-up anchor and approximate selection center. The latter
+    /// gives the action pill a truthful directional-settle vector.
+    var onSelectionGesture: ((_ point: NSPoint, _ selectionCenter: NSPoint) -> Void)?
 
     private var monitors: [Any] = []
     private var downLocation: NSPoint = .zero
@@ -25,7 +26,11 @@ final class MouseMonitor {
             let dy = location.y - self.downLocation.y
             let dragged = (dx * dx + dy * dy).squareRoot() > 5
             if dragged || event.clickCount >= 2 {
-                self.onSelectionGesture?(location)
+                let center = NSPoint(
+                    x: (self.downLocation.x + location.x) / 2,
+                    y: (self.downLocation.y + location.y) / 2
+                )
+                self.onSelectionGesture?(location, center)
             }
         }
         monitors = [down, up].compactMap { $0 }

@@ -10,19 +10,30 @@ final class SelectionActionPresenter {
 
     private static let gap: CGFloat = 10
     private static let screenMargin: CGFloat = 6
+    fileprivate static let shadowInset: CGFloat = 14
 
     private var panel: NSPanel?
     private var hideTimer: Timer?
     private var presentationID = 0
     private var copiedPresentationID: Int?
 
-    func show(at anchor: NSPoint, onCopy: @escaping () -> Void) {
+    func show(
+        at anchor: NSPoint,
+        selectionCenter: NSPoint?,
+        savedToHistory: Bool,
+        onCopy: @escaping () -> Void
+    ) {
         presentationID += 1
         let currentID = presentationID
         copiedPresentationID = nil
         hideTimer?.invalidate()
 
         let view = SelectionActionView(
+            savedToHistory: savedToHistory,
+            initialOffset: Self.directionalSettleOffset(
+                selectionCenter: selectionCenter,
+                anchor: anchor
+            ),
             onCopy: { [weak self] in
                 guard let self, currentID == self.presentationID else { return }
                 self.copiedPresentationID = currentID
@@ -50,7 +61,8 @@ final class SelectionActionPresenter {
         let finalFrame = Self.positionedFrame(
             size: size,
             anchor: anchor,
-            visibleFrame: screen.visibleFrame
+            visibleFrame: screen.visibleFrame,
+            contentInset: Self.shadowInset
         )
 
         panel.setFrame(finalFrame, display: true)
@@ -77,7 +89,8 @@ final class SelectionActionPresenter {
         let finalFrame = Self.positionedFrame(
             size: size,
             anchor: anchor,
-            visibleFrame: screen.visibleFrame
+            visibleFrame: screen.visibleFrame,
+            contentInset: Self.shadowInset
         )
 
         panel.setFrame(finalFrame, display: true)
@@ -113,21 +126,24 @@ final class SelectionActionPresenter {
     static func positionedFrame(
         size: NSSize,
         anchor: NSPoint,
-        visibleFrame: NSRect
+        visibleFrame: NSRect,
+        contentInset: CGFloat = 0
     ) -> NSRect {
         let minimumX = visibleFrame.minX + screenMargin
         let maximumX = max(minimumX, visibleFrame.maxX - size.width - screenMargin)
         let minimumY = visibleFrame.minY + screenMargin
         let maximumY = max(minimumY, visibleFrame.maxY - size.height - screenMargin)
+        let contentWidth = max(0, size.width - contentInset * 2)
+        let contentHeight = max(0, size.height - contentInset * 2)
 
-        var x = anchor.x + gap
+        var x = anchor.x + gap - contentInset
         if x + size.width > visibleFrame.maxX - screenMargin {
-            x = anchor.x - size.width - gap
+            x = anchor.x - contentWidth - gap - contentInset
         }
 
-        var y = anchor.y + gap
+        var y = anchor.y + gap - contentInset
         if y + size.height > visibleFrame.maxY - screenMargin {
-            y = anchor.y - size.height - gap
+            y = anchor.y - contentHeight - gap - contentInset
         }
 
         return NSRect(
@@ -137,6 +153,24 @@ final class SelectionActionPresenter {
             ),
             size: size
         )
+    }
+
+    /// Begin six points back toward the selection, then spring to the mouse-up
+    /// anchor. Double/shift-click has no measurable selection vector.
+    static func directionalSettleOffset(
+        selectionCenter: NSPoint?,
+        anchor: NSPoint
+    ) -> CGSize {
+        guard let selectionCenter else {
+            return CGSize(width: -6, height: 0)
+        }
+        let dx = anchor.x - selectionCenter.x
+        let dy = anchor.y - selectionCenter.y
+        let length = hypot(dx, dy)
+        guard length > 0.5 else {
+            return CGSize(width: -6, height: 0)
+        }
+        return CGSize(width: -dx / length * 6, height: -dy / length * 6)
     }
 
     private func scheduleHide(after delay: TimeInterval, presentationID: Int) {
@@ -171,6 +205,8 @@ final class SelectionActionPresenter {
 }
 
 private struct SelectionActionView: View {
+    let savedToHistory: Bool
+    let initialOffset: CGSize
     let onCopy: () -> Void
     let onHover: (Bool) -> Void
 
@@ -193,9 +229,18 @@ private struct SelectionActionView: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            SavedBadge(theme: theme, iconSize: 16, badgeSize: 9, frame: 18)
-                .help("Saved to Marker")
-                .accessibilityLabel("Saved to Marker")
+            if savedToHistory {
+                SavedBadge(theme: theme, iconSize: 16, badgeSize: 9, frame: 18)
+                    .help("Saved to Marker")
+                    .accessibilityLabel("Saved to Marker")
+            } else {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(theme.accent)
+                    .help("Queued safely — retrying history")
+                    .accessibilityLabel("Queued safely — retrying history")
+            }
 
             Divider()
                 .frame(height: 16)
@@ -217,20 +262,6 @@ private struct SelectionActionView: View {
                         .frame(width: 28, height: 28)
                         .foregroundStyle(copyHovered ? theme.text : theme.dim)
                         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                        .background {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(theme.surface)
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .fill(theme.accent.opacity(
-                                            copyHovered ? choice.keycapHoverTintOpacity : 0
-                                        ))
-                                }
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                        .strokeBorder(theme.text.opacity(0.12), lineWidth: 1)
-                                }
-                        }
                         .animation(.easeOut(duration: 0.1), value: copyHovered)
                 }
                 .buttonStyle(.plain)
@@ -247,12 +278,11 @@ private struct SelectionActionView: View {
         .padding(.horizontal, 9)
         .selectionActionBackground(
             theme: theme,
-            highlightedBorder: copyHovered,
             flashOpacity: flashOpacity
         )
-        .padding(5)
+        .padding(SelectionActionPresenter.shadowInset)
         .onHover(perform: onHover)
-        .modifier(SelectionActionAppearModifier(kind: .action))
+        .modifier(SelectionActionAppearModifier(kind: .action, initialOffset: initialOffset))
     }
 
     private func copy() {
@@ -303,7 +333,7 @@ private struct PasteConfirmationView: View {
         SavedBadge(theme: theme, iconSize: 18, badgeSize: 10, frame: 22)
             .padding(7)
             .selectionActionBackground(theme: theme)
-            .padding(5)
+            .padding(SelectionActionPresenter.shadowInset)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Pasted with Marker")
             .modifier(SelectionActionAppearModifier(kind: .paste))
@@ -333,14 +363,6 @@ struct PillThemePreview: View {
                 .font(.system(size: 13, weight: .semibold))
                 .frame(width: 28, height: 28)
                 .foregroundStyle(theme.dim)
-                .background {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(theme.surface)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .strokeBorder(theme.text.opacity(0.12), lineWidth: 1)
-                        }
-                }
         }
         .frame(minHeight: 32)
         .padding(.horizontal, 9)
@@ -403,9 +425,9 @@ private struct SelectionActionAppearModifier: ViewModifier {
     @State private var offset: CGSize
     @State private var opacity = 0.0
 
-    init(kind: SelectionActionAppearKind) {
+    init(kind: SelectionActionAppearKind, initialOffset: CGSize? = nil) {
         self.kind = kind
-        _offset = State(initialValue: kind.initialOffset)
+        _offset = State(initialValue: initialOffset ?? kind.initialOffset)
     }
 
     func body(content: Content) -> some View {
@@ -437,7 +459,6 @@ private struct SelectionActionAppearModifier: ViewModifier {
 private extension View {
     func selectionActionBackground(
         theme: PillTheme,
-        highlightedBorder: Bool = false,
         flashOpacity: Double = 0
     ) -> some View {
         background {
@@ -451,8 +472,7 @@ private extension View {
             .overlay {
                 if let border = theme.border {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(highlightedBorder ? theme.accent : border, lineWidth: 1)
-                        .animation(.easeOut(duration: 0.1), value: highlightedBorder)
+                        .strokeBorder(border, lineWidth: 1)
                 }
             }
             .shadow(color: .black.opacity(0.3), radius: 9, y: 3)

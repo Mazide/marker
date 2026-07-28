@@ -6,7 +6,10 @@ import SQLite3
 /// in Swift into the *_lc columns at insert time.
 final class SQLiteHistoryDatabase: HistoryDatabase {
     private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private let url: URL
+    private let busyTimeoutMilliseconds: Int32
     private var db: OpaquePointer?
+    private var schemaReady = false
 
     static func defaultURL() -> URL {
         let dir = FileManager.default
@@ -16,61 +19,62 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
         return dir.appendingPathComponent("history.sqlite")
     }
 
-    init(url: URL = SQLiteHistoryDatabase.defaultURL()) {
-        guard sqlite3_open(url.path, &db) == SQLITE_OK else {
-            markerLog.error("sqlite open failed: \(url.path, privacy: .public)")
-            sqlite3_close(db)
-            db = nil
-            return
+    static func recoveryURL() -> URL {
+        defaultURL().deletingLastPathComponent()
+            .appendingPathComponent("history-recovery.json")
+    }
+
+    init(
+        url: URL = SQLiteHistoryDatabase.defaultURL(),
+        busyTimeoutMilliseconds: Int32 = 5000
+    ) {
+        self.url = url
+        self.busyTimeoutMilliseconds = busyTimeoutMilliseconds
+        if openIfNeeded() {
+            migrateLegacyJSONIfNeeded(next(to: url))
         }
-        // A second connection (a stray second Marker instance, sqlite3 in a
-        // terminal) must not turn into dropped writes or an empty-looking
-        // history: wait out short locks, and WAL lets readers coexist with
-        // the writer instead of failing with SQLITE_BUSY.
-        sqlite3_busy_timeout(db, 5000)
-        exec("PRAGMA journal_mode=WAL")
-        exec("""
-        CREATE TABLE IF NOT EXISTS items(
-            id TEXT PRIMARY KEY,
-            text TEXT NOT NULL,
-            text_lc TEXT NOT NULL,
-            date REAL NOT NULL,
-            appName TEXT NOT NULL,
-            appName_lc TEXT NOT NULL,
-            bundleID TEXT NOT NULL
-        )
-        """)
-        exec("CREATE INDEX IF NOT EXISTS idx_items_date ON items(date DESC)")
-        exec("CREATE INDEX IF NOT EXISTS idx_items_text ON items(text)")
-        addRichColumnsIfNeeded()
-        migrateLegacyJSONIfNeeded(next(to: url))
     }
 
     deinit {
-        sqlite3_close(db)
+        close()
     }
 
     // MARK: - HistoryDatabase
 
-    /// Existing databases predate the rich-text columns (0.9.x).
-    private func addRichColumnsIfNeeded() {
-        var existing = Set<String>()
-        withStatement("PRAGMA table_info(items)") { statement in
-            while sqlite3_step(statement) == SQLITE_ROW {
-                existing.insert(column(statement, 1))
+    /// Delete superseded rows and insert their replacement as one commit. A
+    /// failed INSERT rolls the deletes back, so refinement/dedupe can never
+    /// destroy the last durable copy.
+    @discardableResult
+    func save(_ item: SelectionItem, deletingIDs: Set<UUID>) -> Bool {
+        guard openIfNeeded(), execRaw("BEGIN IMMEDIATE") else { return false }
+        var committed = false
+        defer {
+            if !committed {
+                _ = execRaw("ROLLBACK")
             }
         }
-        if !existing.contains("rtf") {
-            exec("ALTER TABLE items ADD COLUMN rtf BLOB")
+
+        for id in deletingIDs {
+            guard executeRaw("DELETE FROM items WHERE id = ?", { statement in
+                bind(statement, 1, id.uuidString)
+            }) else { return false }
         }
-        if !existing.contains("html") {
-            exec("ALTER TABLE items ADD COLUMN html TEXT")
-        }
+        guard executeRaw("DELETE FROM items WHERE text = ?", { statement in
+            bind(statement, 1, item.text)
+        }) else { return false }
+        guard insertRaw(item) else { return false }
+        guard execRaw("COMMIT") else { return false }
+        committed = true
+        return true
     }
 
     @discardableResult
     func insert(_ item: SelectionItem) -> Bool {
-        execute("""
+        save(item, deletingIDs: [])
+    }
+
+    private func insertRaw(_ item: SelectionItem) -> Bool {
+        executeRaw("""
         INSERT OR REPLACE INTO items(id, text, text_lc, date, appName, appName_lc, bundleID, rtf, html)
         VALUES(?,?,?,?,?,?,?,?,?)
         """) { statement in
@@ -115,27 +119,24 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
     }
 
     func clear() {
-        exec("DELETE FROM items")
+        _ = exec("DELETE FROM items")
     }
 
-    func recent(limit: Int, offset: Int) -> [SelectionItem] {
-        var result: [SelectionItem] = []
+    func recent(limit: Int, offset: Int) -> [SelectionItem]? {
         withStatement("SELECT id, text, date, appName, bundleID, rtf, html FROM items ORDER BY date DESC LIMIT ? OFFSET ?") { statement in
             sqlite3_bind_int(statement, 1, Int32(limit))
             sqlite3_bind_int(statement, 2, Int32(offset))
-            result = rows(statement)
+            return rows(statement)
         }
-        return result
     }
 
-    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem] {
+    func query(text: String?, bundleID: String?, limit: Int) -> [SelectionItem]? {
         var sql = "SELECT id, text, date, appName, bundleID, rtf, html FROM items WHERE 1=1"
         if text != nil { sql += " AND (text_lc LIKE ? ESCAPE '\\' OR appName_lc LIKE ? ESCAPE '\\')" }
         if bundleID != nil { sql += " AND bundleID = ?" }
         sql += " ORDER BY date DESC LIMIT ?"
 
-        var result: [SelectionItem] = []
-        withStatement(sql) { statement in
+        return withStatement(sql) { statement in
             var index: Int32 = 1
             if let text {
                 let pattern = "%" + escapeLike(text.lowercased()) + "%"
@@ -146,32 +147,40 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
                 bind(statement, index, bundleID); index += 1
             }
             sqlite3_bind_int(statement, index, Int32(limit))
-            result = rows(statement)
+            return rows(statement)
         }
-        return result
     }
 
-    func apps() -> [(bundleID: String, name: String)] {
+    func apps() -> [(bundleID: String, name: String)]? {
         var result: [(String, String)] = []
-        withStatement("""
+        return withStatement("""
         SELECT bundleID, appName FROM items
         WHERE bundleID != '' GROUP BY bundleID ORDER BY appName_lc
         """) { statement in
-            while sqlite3_step(statement) == SQLITE_ROW {
-                result.append((column(statement, 0), column(statement, 1)))
+            while true {
+                switch sqlite3_step(statement) {
+                case SQLITE_ROW:
+                    result.append((column(statement, 0), column(statement, 1)))
+                case SQLITE_DONE:
+                    return result
+                default:
+                    logCurrentError("sqlite apps read failed")
+                    return nil
+                }
             }
         }
-        return result
     }
 
-    func count() -> Int {
-        var total = 0
+    func count() -> Int? {
         withStatement("SELECT COUNT(*) FROM items") { statement in
-            if sqlite3_step(statement) == SQLITE_ROW {
-                total = Int(sqlite3_column_int(statement, 0))
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                return Int(sqlite3_column_int(statement, 0))
+            default:
+                logCurrentError("sqlite count read failed")
+                return nil
             }
         }
-        return total
     }
 
     // MARK: - Legacy JSON migration (pre-0.3)
@@ -182,58 +191,208 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
 
     private func migrateLegacyJSONIfNeeded(_ jsonURL: URL) {
         var legacy: [SelectionItem] = []
+        let cameFromFile: Bool
         if let data = try? Data(contentsOf: jsonURL),
            let saved = try? JSONDecoder().decode([SelectionItem].self, from: data) {
             legacy = saved
+            cameFromFile = true
         } else if let data = UserDefaults.standard.data(forKey: "selectionHistory"),
                   let saved = try? JSONDecoder().decode([SelectionItem].self, from: data) {
             legacy = saved
+            cameFromFile = false
+        } else {
+            cameFromFile = false
         }
-        guard !legacy.isEmpty, count() == 0 else { return }
-        for item in legacy {
-            insert(item)
+        guard !legacy.isEmpty, let existingCount = count(), existingCount == 0 else { return }
+        guard insertLegacyBatch(legacy) else {
+            markerLog.error("legacy history migration incomplete; source retained for retry")
+            return
         }
-        try? FileManager.default.moveItem(
-            at: jsonURL,
-            to: jsonURL.appendingPathExtension("migrated")
-        )
-        UserDefaults.standard.removeObject(forKey: "selectionHistory")
+        if cameFromFile {
+            do {
+                try FileManager.default.moveItem(
+                    at: jsonURL,
+                    to: jsonURL.appendingPathExtension("migrated")
+                )
+            } catch {
+                markerLog.error("legacy history archive failed: \(error.localizedDescription, privacy: .public)")
+            }
+        } else {
+            UserDefaults.standard.removeObject(forKey: "selectionHistory")
+        }
         markerLog.info("migrated \(legacy.count) history items to sqlite")
+    }
+
+    private func insertLegacyBatch(_ items: [SelectionItem]) -> Bool {
+        guard openIfNeeded(), execRaw("BEGIN IMMEDIATE") else { return false }
+        var committed = false
+        defer {
+            if !committed {
+                _ = execRaw("ROLLBACK")
+            }
+        }
+        guard items.allSatisfy({ insertRaw($0) }),
+              execRaw("COMMIT")
+        else { return false }
+        committed = true
+        return true
     }
 
     // MARK: - SQLite helpers
 
-    private func exec(_ sql: String) {
-        if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
-            markerLog.error("sqlite exec failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
+    /// Open and fully migrate the schema before exposing the connection. Any
+    /// failure closes it so the next read/write retries from a clean handle
+    /// instead of leaving the app in a permanently empty-looking session.
+    private func openIfNeeded() -> Bool {
+        if schemaReady, db != nil { return true }
+        close()
+
+        var handle: OpaquePointer?
+        guard sqlite3_open(url.path, &handle) == SQLITE_OK else {
+            db = handle
+            logCurrentError("sqlite open failed")
+            close()
+            return false
+        }
+        db = handle
+        sqlite3_busy_timeout(db, busyTimeoutMilliseconds)
+
+        guard execRaw("PRAGMA journal_mode=WAL"),
+              migrateSchema()
+        else {
+            close()
+            return false
+        }
+        schemaReady = true
+        return true
+    }
+
+    /// Existing databases predate the rich-text columns (0.9.x). Schema
+    /// changes are one transaction: readers see either the old schema or the
+    /// complete new one, never a half-migrated database.
+    private func migrateSchema() -> Bool {
+        guard execRaw("BEGIN IMMEDIATE") else { return false }
+        var committed = false
+        defer {
+            if !committed {
+                _ = execRaw("ROLLBACK")
+            }
+        }
+
+        guard execRaw("""
+        CREATE TABLE IF NOT EXISTS items(
+            id TEXT PRIMARY KEY,
+            text TEXT NOT NULL,
+            text_lc TEXT NOT NULL,
+            date REAL NOT NULL,
+            appName TEXT NOT NULL,
+            appName_lc TEXT NOT NULL,
+            bundleID TEXT NOT NULL,
+            rtf BLOB,
+            html TEXT
+        )
+        """),
+        execRaw("CREATE INDEX IF NOT EXISTS idx_items_date ON items(date DESC)"),
+        execRaw("CREATE INDEX IF NOT EXISTS idx_items_text ON items(text)"),
+        let columns = tableColumnsRaw()
+        else { return false }
+
+        if !columns.contains("rtf"), !execRaw("ALTER TABLE items ADD COLUMN rtf BLOB") {
+            return false
+        }
+        if !columns.contains("html"), !execRaw("ALTER TABLE items ADD COLUMN html TEXT") {
+            return false
+        }
+        guard execRaw("COMMIT") else { return false }
+        committed = true
+        return true
+    }
+
+    private func tableColumnsRaw() -> Set<String>? {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(items)", -1, &statement, nil) == SQLITE_OK else {
+            logCurrentError("sqlite schema read failed")
+            return nil
+        }
+        defer { sqlite3_finalize(statement) }
+
+        var columns = Set<String>()
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                columns.insert(column(statement, 1))
+            case SQLITE_DONE:
+                return columns
+            default:
+                logCurrentError("sqlite schema step failed")
+                return nil
+            }
         }
     }
 
-    /// Run a data-changing statement; true only when it ran to completion.
-    @discardableResult
-    private func execute(_ sql: String, _ bindings: (OpaquePointer?) -> Void) -> Bool {
-        var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            markerLog.error("sqlite prepare failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
-            return false
+    private func close() {
+        if let db {
+            sqlite3_close(db)
         }
-        defer { sqlite3_finalize(statement) }
-        bindings(statement)
-        guard sqlite3_step(statement) == SQLITE_DONE else {
-            markerLog.error("sqlite step failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
+        db = nil
+        schemaReady = false
+    }
+
+    @discardableResult
+    private func exec(_ sql: String) -> Bool {
+        guard openIfNeeded() else { return false }
+        return execRaw(sql)
+    }
+
+    @discardableResult
+    private func execRaw(_ sql: String) -> Bool {
+        guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+            logCurrentError("sqlite exec failed")
             return false
         }
         return true
     }
 
-    private func withStatement(_ sql: String, _ body: (OpaquePointer?) -> Void) {
+    @discardableResult
+    private func execute(_ sql: String, _ bindings: (OpaquePointer?) -> Void) -> Bool {
+        guard openIfNeeded() else { return false }
+        return executeRaw(sql, bindings)
+    }
+
+    /// Run a data-changing statement; true only when it ran to completion.
+    @discardableResult
+    private func executeRaw(_ sql: String, _ bindings: (OpaquePointer?) -> Void) -> Bool {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
-            markerLog.error("sqlite prepare failed: \(String(cString: sqlite3_errmsg(self.db)), privacy: .public)")
-            return
+            logCurrentError("sqlite prepare failed")
+            return false
         }
-        body(statement)
-        sqlite3_finalize(statement)
+        defer { sqlite3_finalize(statement) }
+        bindings(statement)
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            logCurrentError("sqlite step failed")
+            return false
+        }
+        return true
+    }
+
+    private func withStatement<T>(
+        _ sql: String,
+        _ body: (OpaquePointer?) -> T?
+    ) -> T? {
+        guard openIfNeeded() else { return nil }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            logCurrentError("sqlite prepare failed")
+            return nil
+        }
+        defer { sqlite3_finalize(statement) }
+        return body(statement)
+    }
+
+    private func logCurrentError(_ prefix: String) {
+        let message = db.map { String(cString: sqlite3_errmsg($0)) } ?? "no database handle"
+        markerLog.error("\(prefix, privacy: .public): \(message, privacy: .public)")
     }
 
     private func bind(_ statement: OpaquePointer?, _ index: Int32, _ value: String) {
@@ -245,20 +404,27 @@ final class SQLiteHistoryDatabase: HistoryDatabase {
         return String(cString: cString)
     }
 
-    private func rows(_ statement: OpaquePointer?) -> [SelectionItem] {
+    private func rows(_ statement: OpaquePointer?) -> [SelectionItem]? {
         var result: [SelectionItem] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
-            result.append(SelectionItem(
-                id: UUID(uuidString: column(statement, 0)) ?? UUID(),
-                text: column(statement, 1),
-                date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 2)),
-                appName: column(statement, 3),
-                bundleID: column(statement, 4),
-                rtf: blobColumn(statement, 5),
-                html: optionalColumn(statement, 6)
-            ))
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                result.append(SelectionItem(
+                    id: UUID(uuidString: column(statement, 0)) ?? UUID(),
+                    text: column(statement, 1),
+                    date: Date(timeIntervalSince1970: sqlite3_column_double(statement, 2)),
+                    appName: column(statement, 3),
+                    bundleID: column(statement, 4),
+                    rtf: blobColumn(statement, 5),
+                    html: optionalColumn(statement, 6)
+                ))
+            case SQLITE_DONE:
+                return result
+            default:
+                logCurrentError("sqlite row read failed")
+                return nil
+            }
         }
-        return result
     }
 
     private func blobColumn(_ statement: OpaquePointer?, _ index: Int32) -> Data? {

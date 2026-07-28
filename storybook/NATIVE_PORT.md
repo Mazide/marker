@@ -22,11 +22,11 @@ Canonical layout unchanged: `[status: app icon 16 + green check badge 9] | divid
 
 - Status zone = **bare**: no container, no hover reaction, opacity 0.8,
   `cursor` stays arrow. Semantics: "already done, nothing to press".
-- Copy zone = **keycap**: visible container at rest — fill white 9%,
-  1 px inset ring (white 12%), radius 7. Hover: fill brightens to ~14%,
-  icon white 100%, pointing-hand cursor (`NSCursor.pointingHand` via `onHover`).
-- Copied state: keycap disappears, bare green check in its place
-  (bare = status language; nothing left to press).
+- Copy zone = **bare icon** in a 28×28 hit area: no fill or outline in any
+  theme, at rest or on hover. Hover only brightens the icon to 100% and uses
+  the pointing-hand cursor (`NSCursor.pointingHand` via `onHover`).
+- Copied state: bare green check replaces the copy icon
+  (status language; nothing left to press).
 - Paste confirmation: bare badge only, no container ever.
 
 ## S2 chip (default theme "Ink")
@@ -44,11 +44,11 @@ Canonical layout unchanged: `[status: app icon 16 + green check badge 9] | divid
 ```swift
 struct PillTheme {
     let chip: Color          // chip background (opaque-ish)
-    let surface: Color       // keycap fill
+    let surface: Color       // secondary app surface
     let border: Color?       // 1px pane border (nil for Ink)
     let text: Color          // primary glyphs
     let dim: Color           // status-zone / secondary
-    let accent: Color        // hover accent (keycap hover tint, pane border hover)
+    let accent: Color        // theme accent
     let success: Color       // check badge / copied
 }
 enum PillThemeChoice: String, CaseIterable { // @AppStorage("pillTheme"), default .ink

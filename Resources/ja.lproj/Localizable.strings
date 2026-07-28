@@ -41,6 +41,14 @@
 "Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker は macOS のアクセシビリティ機能で選択テキストを読み取ります。データが Mac の外に出ることはありません。";
 "Open System Settings" = "システム設定を開く";
 "Nothing here yet" = "まだ何もありません";
+"History is temporarily unavailable" = "履歴を一時的に利用できません";
+"Your saved data was left untouched." = "保存済みのデータは変更されていません。";
+"Retry" = "再試行";
+"Queued safely — retrying history" = "安全に待機中 — 履歴への保存を再試行しています";
+"Couldn't save to history" = "履歴に保存できませんでした";
+"Search selections" = "選択履歴を検索";
+"Select text in any app — it lands here, ready to copy or paste." = "どのアプリでもテキストを選択すると、コピーやペーストできる状態でここに表示されます。";
+"· captured from" = "· 取得元";
 "Select text in any app — it lands here, already copied." = "どのアプリでもテキストを選択すると、コピー済みの状態でここに表示されます。";
 "No matches" = "一致なし";
 "Nothing selected like that. Try fewer letters or another app filter." = "該当する選択はありません。文字数を減らすか、別のアプリフィルタをお試しください。";

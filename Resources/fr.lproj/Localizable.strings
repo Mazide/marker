@@ -41,6 +41,14 @@
 "Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker lit les sélections via l'accessibilité de macOS. Rien ne quitte votre Mac.";
 "Open System Settings" = "Ouvrir Réglages Système";
 "Nothing here yet" = "Rien ici pour l'instant";
+"History is temporarily unavailable" = "L’historique est temporairement indisponible";
+"Your saved data was left untouched." = "Vos données enregistrées n’ont pas été modifiées.";
+"Retry" = "Réessayer";
+"Queued safely — retrying history" = "Mis en attente en sécurité — nouvel essai de l’historique";
+"Couldn't save to history" = "Impossible d’enregistrer dans l’historique";
+"Search selections" = "Rechercher dans les sélections";
+"Select text in any app — it lands here, ready to copy or paste." = "Sélectionnez du texte dans n’importe quelle app : il apparaîtra ici, prêt à copier ou coller.";
+"· captured from" = "· capturé depuis";
 "Select text in any app — it lands here, already copied." = "Sélectionnez du texte dans n'importe quelle app — il arrive ici, déjà copié.";
 "No matches" = "Aucun résultat";
 "Nothing selected like that. Try fewer letters or another app filter." = "Aucune sélection ne correspond. Essayez moins de lettres ou un autre filtre d'app.";

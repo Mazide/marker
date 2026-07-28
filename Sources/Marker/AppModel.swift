@@ -17,7 +17,10 @@ enum ThreeFingerPasteMode: String, CaseIterable {
 final class AppModel {
     static let shared = AppModel()
 
-    let history = HistoryStore(db: SQLiteHistoryDatabase())
+    let history = HistoryStore(
+        db: SQLiteHistoryDatabase(),
+        recoveryURL: SQLiteHistoryDatabase.recoveryURL()
+    )
     var axTrusted = AXIsProcessTrusted()
 
     var launchAtLogin: Bool = (SMAppService.mainApp.status == .enabled) {
@@ -165,7 +168,11 @@ final class AppModel {
     @ObservationIgnored private var tapHealthTimer: Timer?
     /// Mouse-up (or shift-click) point waiting for the capture engine to
     /// confirm that the gesture really selected text.
-    @ObservationIgnored private var captureActionAnchor: (point: NSPoint, date: Date)?
+    @ObservationIgnored private var captureActionAnchor: (
+        point: NSPoint,
+        selectionCenter: NSPoint?,
+        date: Date
+    )?
     /// Cursor point for a gesture paste. PasteEngine may wait for modifiers,
     /// so show feedback only when it reaches the actual paste operation.
     @ObservationIgnored private var pendingPasteFeedbackAnchor: NSPoint?
@@ -212,12 +219,12 @@ final class AppModel {
         mouseMonitor.onMouseDown = { [weak self] shiftClick, point in
             SelectionActionPresenter.shared.dismiss()
             if shiftClick {
-                self?.captureActionAnchor = (point, Date())
+                self?.captureActionAnchor = (point, nil, Date())
             }
             self?.engine.mouseDown(shiftClick: shiftClick)
         }
-        mouseMonitor.onSelectionGesture = { [weak self] point in
-            self?.captureActionAnchor = (point, Date())
+        mouseMonitor.onSelectionGesture = { [weak self] point, selectionCenter in
+            self?.captureActionAnchor = (point, selectionCenter, Date())
             self?.engine.selectionGesture()
         }
         engine.onCapture = { [weak self] content, app, _ in
@@ -434,7 +441,11 @@ final class AppModel {
         // selection is what the user means to paste now.
         pickedPasteItemID = nil
         if toastEnabled, let actionAnchor {
-            SelectionActionPresenter.shared.show(at: actionAnchor) { [weak self] in
+            SelectionActionPresenter.shared.show(
+                at: actionAnchor.point,
+                selectionCenter: actionAnchor.selectionCenter,
+                savedToHistory: saved
+            ) { [weak self] in
                 self?.copyToClipboard(content)
             }
         }
@@ -443,7 +454,7 @@ final class AppModel {
                 text: content.plain,
                 appName: app.name,
                 bundleID: app.bundleID,
-                warning: "Couldn't save to history"
+                warning: String(localized: "Couldn't save to history")
             )
         }
     }
@@ -451,11 +462,11 @@ final class AppModel {
     /// Captures normally settle within 0.15–0.9s. Anything older belongs to
     /// an abandoned gesture and must not make a later capture appear in the
     /// wrong place.
-    private func takeCaptureActionAnchor() -> NSPoint? {
+    private func takeCaptureActionAnchor() -> (point: NSPoint, selectionCenter: NSPoint?)? {
         guard let anchor = captureActionAnchor else { return nil }
         captureActionAnchor = nil
         guard Date().timeIntervalSince(anchor.date) < 2 else { return nil }
-        return anchor.point
+        return (anchor.point, anchor.selectionCenter)
     }
 
     /// What ⌥V and the click gestures should paste — usually the newest

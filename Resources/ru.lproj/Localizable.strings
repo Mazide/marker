@@ -41,6 +41,14 @@
 "Marker reads selections through macOS Accessibility. Nothing leaves your Mac." = "Marker читает выделения через Универсальный доступ macOS. Данные не покидают ваш Mac.";
 "Open System Settings" = "Открыть Системные настройки";
 "Nothing here yet" = "Пока пусто";
+"History is temporarily unavailable" = "История временно недоступна";
+"Your saved data was left untouched." = "Сохранённые данные не затронуты.";
+"Retry" = "Повторить";
+"Queued safely — retrying history" = "Безопасно в очереди — повторяем запись в историю";
+"Couldn't save to history" = "Не удалось сохранить в историю";
+"Search selections" = "Поиск по выделениям";
+"Select text in any app — it lands here, ready to copy or paste." = "Выделите текст в любом приложении — он появится здесь для копирования или вставки.";
+"· captured from" = "· захвачено из";
 "Select text in any app — it lands here, already copied." = "Выделите текст в любом приложении — он появится здесь, уже скопированный.";
 "No matches" = "Ничего не найдено";
 "Nothing selected like that. Try fewer letters or another app filter." = "Такого не выделяли. Попробуйте запрос короче или другой фильтр.";

@@ -29,7 +29,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         db.insert(item("old", offset: 0))
         db.insert(item("new", offset: 10))
 
-        XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["new", "old"])
+        XCTAssertEqual(db.recent(limit: 10, offset: 0)!.map(\.text), ["new", "old"])
         XCTAssertEqual(db.count(), 2)
     }
 
@@ -37,7 +37,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         for i in 0..<10 {
             db.insert(item("item \(i)", offset: Double(i)))
         }
-        let page2 = db.recent(limit: 3, offset: 3)
+        let page2 = db.recent(limit: 3, offset: 3)!
         XCTAssertEqual(page2.map(\.text), ["item 6", "item 5", "item 4"])
     }
 
@@ -45,27 +45,27 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         db.insert(item("Оформить Таблицу"))
         db.insert(item("другое"))
 
-        XCTAssertEqual(db.query(text: "оформить", bundleID: nil, limit: 10).count, 1)
-        XCTAssertEqual(db.query(text: "ТАБЛИЦУ", bundleID: nil, limit: 10).count, 1)
+        XCTAssertEqual(db.query(text: "оформить", bundleID: nil, limit: 10)!.count, 1)
+        XCTAssertEqual(db.query(text: "ТАБЛИЦУ", bundleID: nil, limit: 10)!.count, 1)
     }
 
     func testSearchMatchesAppName() {
         db.insert(item("some text", app: "Google Chrome", bundleID: "com.google.Chrome"))
-        XCTAssertEqual(db.query(text: "chrome", bundleID: nil, limit: 10).count, 1)
+        XCTAssertEqual(db.query(text: "chrome", bundleID: nil, limit: 10)!.count, 1)
     }
 
     func testLikeWildcardsAreEscaped() {
         db.insert(item("100% done"))
         db.insert(item("100 percent"))
 
-        XCTAssertEqual(db.query(text: "100%", bundleID: nil, limit: 10).map(\.text), ["100% done"])
+        XCTAssertEqual(db.query(text: "100%", bundleID: nil, limit: 10)!.map(\.text), ["100% done"])
     }
 
     func testBundleFilter() {
         db.insert(item("a", app: "Telegram", bundleID: "org.telegram"))
         db.insert(item("b", app: "Chrome", bundleID: "com.google.Chrome", offset: 1))
 
-        XCTAssertEqual(db.query(text: nil, bundleID: "org.telegram", limit: 10).map(\.text), ["a"])
+        XCTAssertEqual(db.query(text: nil, bundleID: "org.telegram", limit: 10)!.map(\.text), ["a"])
     }
 
     func testDeleteAllByText() {
@@ -73,7 +73,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         db.insert(item("keep", offset: 1))
         db.deleteAll(text: "dup")
 
-        XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["keep"])
+        XCTAssertEqual(db.recent(limit: 10, offset: 0)!.map(\.text), ["keep"])
     }
 
     func testRichFlavorsRoundTrip() {
@@ -86,13 +86,13 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         ))
         db.insert(item("plain", offset: 10))
 
-        let loaded = db.recent(limit: 10, offset: 0)
+        let loaded = db.recent(limit: 10, offset: 0)!
         XCTAssertNil(loaded[0].rtf)
         XCTAssertNil(loaded[0].html)
         XCTAssertEqual(loaded[1].rtf, rtf)
         XCTAssertEqual(loaded[1].html, "<b>styled</b>")
 
-        let queried = db.query(text: "styled", bundleID: nil, limit: 10)
+        let queried = db.query(text: "styled", bundleID: nil, limit: 10)!
         XCTAssertEqual(queried.first?.rtf, rtf)
     }
 
@@ -122,7 +122,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
 
         db = SQLiteHistoryDatabase(url: url)
 
-        let loaded = db.recent(limit: 10, offset: 0)
+        let loaded = db.recent(limit: 10, offset: 0)!
         XCTAssertEqual(loaded.map(\.text), ["legacy"])
         XCTAssertNil(loaded[0].rtf)
 
@@ -132,7 +132,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
             appName: "Safari", bundleID: "com.apple.Safari",
             rtf: Data("r".utf8), html: nil
         ))
-        XCTAssertEqual(db.recent(limit: 10, offset: 0).first?.rtf, Data("r".utf8))
+        XCTAssertEqual(db.recent(limit: 10, offset: 0)!.first?.rtf, Data("r".utf8))
     }
 
     func testDeleteOlderThanCutoff() {
@@ -141,7 +141,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
 
         db.deleteOlderThan(Date(timeIntervalSince1970: 1_000_000 + 50))
 
-        XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["new"])
+        XCTAssertEqual(db.recent(limit: 10, offset: 0)!.map(\.text), ["new"])
         XCTAssertEqual(db.count(), 1)
     }
 
@@ -150,7 +150,7 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         db.insert(item("b", offset: 1))
         db.insert(item("c", app: "Chrome", bundleID: "com.google.Chrome", offset: 2))
 
-        XCTAssertEqual(db.apps().map(\.bundleID).sorted(), ["com.google.Chrome", "org.telegram"])
+        XCTAssertEqual(db.apps()!.map(\.bundleID).sorted(), ["com.google.Chrome", "org.telegram"])
     }
 
     func testInsertReportsSuccess() {
@@ -178,7 +178,63 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         XCTAssertTrue(second.insert(item("from second", offset: 1)))
 
         XCTAssertEqual(db.count(), 2)
-        XCTAssertEqual(second.recent(limit: 10, offset: 0).map(\.text), ["from second", "from first"])
+        XCTAssertEqual(second.recent(limit: 10, offset: 0)!.map(\.text), ["from second", "from first"])
+    }
+
+    func testFailedReplacementRollsBackPredecessorDeletion() {
+        let predecessor = item("old")
+        XCTAssertTrue(db.insert(predecessor))
+
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &raw), SQLITE_OK)
+        defer { sqlite3_close(raw) }
+        XCTAssertEqual(sqlite3_exec(raw, """
+        CREATE TRIGGER reject_new BEFORE INSERT ON items
+        WHEN NEW.text = 'new'
+        BEGIN
+            SELECT RAISE(ABORT, 'simulated insert failure');
+        END
+        """, nil, nil, nil), SQLITE_OK)
+
+        let replacement = item("new", offset: 1)
+        XCTAssertFalse(db.save(replacement, deletingIDs: [predecessor.id]))
+
+        XCTAssertEqual(db.recent(limit: 10, offset: 0)!.map(\.text), ["old"])
+    }
+
+    func testLockedPreRichMigrationFailsClosedThenRetriesWithoutDataLoss() {
+        db = nil
+        try? FileManager.default.removeItem(at: url)
+
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &raw), SQLITE_OK)
+        defer { sqlite3_close(raw) }
+        XCTAssertEqual(sqlite3_exec(raw, """
+        CREATE TABLE items(
+            id TEXT PRIMARY KEY,
+            text TEXT NOT NULL,
+            text_lc TEXT NOT NULL,
+            date REAL NOT NULL,
+            appName TEXT NOT NULL,
+            appName_lc TEXT NOT NULL,
+            bundleID TEXT NOT NULL
+        );
+        INSERT INTO items VALUES(
+            '00000000-0000-0000-0000-000000000001',
+            'legacy', 'legacy', 1000000, 'Telegram', 'telegram', 'org.telegram'
+        );
+        BEGIN EXCLUSIVE;
+        """, nil, nil, nil), SQLITE_OK)
+
+        let upgrading = SQLiteHistoryDatabase(url: url, busyTimeoutMilliseconds: 0)
+        XCTAssertNil(upgrading.recent(limit: 10, offset: 0),
+                     "a failed migration must not masquerade as empty history")
+
+        XCTAssertEqual(sqlite3_exec(raw, "COMMIT", nil, nil, nil), SQLITE_OK)
+        XCTAssertEqual(upgrading.recent(limit: 10, offset: 0)!.map(\.text), ["legacy"])
+        XCTAssertTrue(upgrading.insert(item("after retry", offset: 1)))
+        XCTAssertEqual(upgrading.count(), 2)
+        db = upgrading
     }
 
     func testPersistsAcrossReopen() {
@@ -186,6 +242,6 @@ final class SQLiteHistoryDatabaseTests: XCTestCase {
         db = nil
         db = SQLiteHistoryDatabase(url: url)
 
-        XCTAssertEqual(db.recent(limit: 10, offset: 0).map(\.text), ["survives"])
+        XCTAssertEqual(db.recent(limit: 10, offset: 0)!.map(\.text), ["survives"])
     }
 }

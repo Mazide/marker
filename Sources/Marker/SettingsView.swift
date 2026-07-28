@@ -212,6 +212,9 @@ private struct GeneralSettingsView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(Text(verbatim: choice.displayName))
+                            .accessibilityAddTraits(
+                                pillTheme == choice.rawValue ? .isSelected : []
+                            )
                         }
                     }
                     .padding(.vertical, 2)

@@ -33,17 +33,6 @@ enum PillThemeChoice: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Alpha for the shared accent-over-surface hover treatment. The rice
-    /// palettes use their canonical 82/18 mix; HUD themes target their
-    /// documented white-fill levels.
-    var keycapHoverTintOpacity: Double {
-        switch self {
-        case .ink: 0.055
-        case .oled: 0.11
-        case .catppuccin, .gruvbox, .tokyonight, .rosepine: 0.18
-        }
-    }
-
     /// Ink and OLED are dark HUD palettes in both system appearances. Rice
     /// themes keep following the current macOS appearance.
     var preferredColorScheme: ColorScheme? {
