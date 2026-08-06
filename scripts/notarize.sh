@@ -7,6 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 KEYCHAIN_PROFILE="${NOTARY_PROFILE:-waymark-notary}"
+IDENTITY="${MARKER_SIGN_IDENTITY:-Developer ID Application}"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)"
 APP="build/Marker.app"
 DIST="build/dist"
@@ -37,6 +38,10 @@ mkdir -p "$DMG_STAGE"
 cp -R "$APP" "$DMG_STAGE/"
 ln -s /Applications "$DMG_STAGE/Applications"
 hdiutil create -volname "Marker" -srcfolder "$DMG_STAGE" -fs HFS+ -ov -format UDZO "$DMG"
+
+echo "==> Signing DMG…"
+codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+codesign --verify --strict --verbose=2 "$DMG"
 
 # The DMG needs its own ticket: the app's ticket does not cover the
 # container, and stapling requires one per file. Second submit is quick —
