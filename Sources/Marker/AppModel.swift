@@ -10,6 +10,11 @@ enum ThreeFingerPasteMode: String, CaseIterable {
     case off
     case click
     case doubleTap
+
+    static func fromStoredValue(_ raw: String?, legacyClickEnabled: Bool) -> Self {
+        if let raw, let mode = Self(rawValue: raw) { return mode }
+        return legacyClickEnabled ? .click : .off
+    }
 }
 
 @Observable
@@ -95,24 +100,26 @@ final class AppModel {
 
     /// Trackpad three-finger paste as a middle-click substitute, via the
     /// private MultitouchSupport API — experimental, off by default. Click
-    /// is the deliberate, false-positive-proof trigger; double tap is the
-    /// no-force alternative for tap-to-click hands.
+    /// is the deliberate trigger; double tap is protected by touch geometry,
+    /// AppKit swipe signals, and app/Space change suppression.
     var threeFingerPasteMode: ThreeFingerPasteMode = AppModel.storedThreeFingerPasteMode() {
         didSet {
             UserDefaults.standard.set(threeFingerPasteMode.rawValue, forKey: "threeFingerPasteMode")
+            trackpadTap.cancelTapSequence(reason: .modeChanged)
             if threeFingerPasteMode != .off { trackpadTap.start() }
         }
     }
 
     /// Migration: before the mode picker there was a bool toggle (under
     /// the even older "threeFingerTapEnabled" key) whose only behavior was
-    /// the physical click.
+    /// the physical click. A stored explicit mode, including double tap,
+    /// remains authoritative.
     private static func storedThreeFingerPasteMode() -> ThreeFingerPasteMode {
-        if let raw = UserDefaults.standard.string(forKey: "threeFingerPasteMode"),
-           let mode = ThreeFingerPasteMode(rawValue: raw) {
-            return mode
-        }
-        return UserDefaults.standard.bool(forKey: "threeFingerTapEnabled") ? .click : .off
+        let defaults = UserDefaults.standard
+        return ThreeFingerPasteMode.fromStoredValue(
+            defaults.string(forKey: "threeFingerPasteMode"),
+            legacyClickEnabled: defaults.bool(forKey: "threeFingerTapEnabled")
+        )
     }
 
     /// Selections immediately typed over were made to edit, not to copy;
@@ -176,6 +183,9 @@ final class AppModel {
     /// Cursor point for a gesture paste. PasteEngine may wait for modifiers,
     /// so show feedback only when it reaches the actual paste operation.
     @ObservationIgnored private var pendingPasteFeedbackAnchor: NSPoint?
+    /// AX identity captured at the beginning of the first tap. It survives
+    /// the pair and the late-swipe guard, then must compare equal at paste.
+    @ObservationIgnored private var threeFingerTapTarget: FocusedPasteTarget?
 
     // Domain layer
     @ObservationIgnored private var engine: CaptureEngine!
@@ -199,6 +209,10 @@ final class AppModel {
     func start() {
         axMonitor.onSelectionChanged = { [weak self] in
             self?.engine.axSelectionChanged()
+        }
+        axMonitor.onFocusedElementChanged = { [weak self] in
+            guard let self else { return }
+            self.trackpadTap.cancelTapSequence(reason: .focusChanged)
         }
         axMonitor.onKeyDown = { [weak self] isIntent, isTyping, isMarkerSynthetic in
             if !isMarkerSynthetic {
@@ -269,11 +283,32 @@ final class AppModel {
             self.pasteEngine.pasteIntoActiveApp(item.content)
             return true
         }
+        trackpadTap.onFirstTouchSessionStarted = { [weak self] in
+            guard let self,
+                  self.threeFingerPasteMode == .doubleTap,
+                  self.axTrusted
+            else {
+                self?.threeFingerTapTarget = nil
+                return
+            }
+            self.threeFingerTapTarget = self.axMonitor.focusedEditablePasteTarget()
+        }
+        trackpadTap.onTapSequenceInvalidated = { [weak self] in
+            self?.threeFingerTapTarget = nil
+        }
         trackpadTap.onThreeFingerDoubleTap = { [weak self] in
-            guard let self, self.threeFingerPasteMode == .doubleTap, self.axTrusted,
-                  self.shouldPasteAtCursor(input: "three-finger double tap", isTap: true),
+            guard let self else { return }
+            defer { self.threeFingerTapTarget = nil }
+            guard self.threeFingerPasteMode == .doubleTap,
+                  self.axTrusted,
+                  !self.trackpadTap.isSwipeSuppressed(),
+                  let target = self.threeFingerTapTarget,
+                  self.axMonitor.isStillFocusedEditable(target),
                   let item = self.itemToPaste()
-            else { return }
+            else {
+                diagLog("three-finger double tap ignored: target or mode changed")
+                return
+            }
             self.pendingPasteFeedbackAnchor = NSEvent.mouseLocation
             self.pasteEngine.pasteIntoActiveApp(item.content)
         }
@@ -496,16 +531,14 @@ final class AppModel {
         return picked
     }
 
-    /// Shared gate for the cursor-targeted triggers; they all paste into the
-    /// focused element, so they share one cursor/focus policy. Clicks pass
-    /// through when the policy says no, so they may not claim rich-text
-    /// content roles — a tap consumes nothing and can.
-    private func shouldPasteAtCursor(input: String, isTap: Bool = false) -> Bool {
+    /// Shared gate for the cursor-targeted paste triggers. Clicks pass
+    /// through when the policy says no, so the cursor role decides first
+    /// and the focused element is only a fallback.
+    private func shouldPasteAtCursor(input: String) -> Bool {
         let cursorRole = axMonitor.roleAtMouseLocation()
         guard MiddlePastePolicy.shouldPaste(
             cursorRole: cursorRole,
-            focusedRole: { self.axMonitor.focusedElementRole() },
-            allowContentRoleFallback: isTap
+            focusedRole: { self.axMonitor.focusedElementRole() }
         ) else {
             let focused = axMonitor.focusedElementRole() ?? "nil"
             diagLog("\(input) ignored: cursor=\(cursorRole ?? "nil") focused=\(focused)")

@@ -1,11 +1,20 @@
 import AppKit
 import ApplicationServices
 
+/// Opaque identity captured at the start of a double-tap sequence. Keeping
+/// the AX element itself lets the final guard reject a focus change even when
+/// the replacement happens to have the same role.
+struct FocusedPasteTarget {
+    fileprivate let pid: pid_t
+    fileprivate let element: AXUIElement
+}
+
 /// Thin AX adapter: subscribes to selection-changed notifications on the
 /// frontmost app, watches keystrokes for selection intent, and reads
 /// selections on demand. All decisions live in CaptureEngine.
 final class AXSelectionMonitor: NSObject, SelectionReading {
     var onSelectionChanged: (() -> Void)?
+    var onFocusedElementChanged: (() -> Void)?
     var onKeyDown: ((
         _ isSelectionIntent: Bool,
         _ isPlainTyping: Bool,
@@ -70,13 +79,34 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
     /// return nothing useful from position hit-testing but do report focus.
     func focusedElementRole() -> String? {
         guard let focused = focusedElement() else { return nil }
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            focused,
-            kAXRoleAttribute as CFString,
-            &roleRef
-        ) == .success else { return nil }
-        return roleRef as? String
+        return role(of: focused)
+    }
+
+    /// Capture only an editable element owned by the frontmost process.
+    /// Missing or inconsistent AX data fails closed.
+    func focusedEditablePasteTarget() -> FocusedPasteTarget? {
+        guard let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+              let focused = focusedElement(),
+              MiddlePastePolicy.shouldPaste(role: role(of: focused))
+        else { return nil }
+        var elementPID: pid_t = 0
+        guard AXUIElementGetPid(focused, &elementPID) == .success,
+              elementPID == frontmostPID
+        else { return nil }
+        return FocusedPasteTarget(pid: elementPID, element: focused)
+    }
+
+    /// Revalidate process, AX identity, and editable role immediately before
+    /// a delayed gesture paste.
+    func isStillFocusedEditable(_ target: FocusedPasteTarget) -> Bool {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid,
+              let focused = focusedElement(),
+              CFEqual(focused, target.element),
+              MiddlePastePolicy.shouldPaste(role: role(of: focused))
+        else { return false }
+        var elementPID: pid_t = 0
+        return AXUIElementGetPid(focused, &elementPID) == .success
+            && elementPID == target.pid
     }
 
     func roleAtMouseLocation() -> String? {
@@ -130,9 +160,14 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
 
         let pid = app.processIdentifier
         var newObserver: AXObserver?
-        let callback: AXObserverCallback = { _, element, _, refcon in
+        let callback: AXObserverCallback = { _, element, notification, refcon in
             guard let refcon else { return }
             let monitor = Unmanaged<AXSelectionMonitor>.fromOpaque(refcon).takeUnretainedValue()
+            if notification as String == kAXFocusedUIElementChangedNotification as String {
+                monitor.pendingElement = nil
+                monitor.onFocusedElementChanged?()
+                return
+            }
             monitor.pendingElement = element
             monitor.onSelectionChanged?()
         }
@@ -158,6 +193,14 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
             markerLog.error("AXObserverAddNotification failed for \(app.localizedName ?? "?", privacy: .public): \(addErr.rawValue)")
             return
         }
+        // Not every app exposes focus notifications. The final identity
+        // check still protects those apps, so failure here is non-fatal.
+        _ = AXObserverAddNotification(
+            newObserver,
+            element,
+            kAXFocusedUIElementChangedNotification as CFString,
+            refcon
+        )
 
         CFRunLoopAddSource(
             CFRunLoopGetMain(),
@@ -410,5 +453,15 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
             }
         }
         return nil
+    }
+
+    private func role(of element: AXUIElement) -> String? {
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXRoleAttribute as CFString,
+            &roleRef
+        ) == .success else { return nil }
+        return roleRef as? String
     }
 }
