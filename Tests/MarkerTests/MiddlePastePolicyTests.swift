@@ -28,6 +28,18 @@ final class MiddlePastePolicyTests: XCTestCase {
             cursorRole: nil, focusedRole: { nil }))
     }
 
+    func testFallsBackToFocusedElementOverBlankWebArea() {
+        // Chrome hit-tests the blank canvas of a page as AXWebArea while a
+        // real input keeps focus — a middle-click there may paste. Links and
+        // buttons hit-test as their own roles, so they are unaffected.
+        XCTAssertTrue(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXWebArea", focusedRole: { "AXTextField" }))
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXWebArea", focusedRole: { "AXWebArea" }))
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXWebArea", focusedRole: { nil }))
+    }
+
     func testNoFallbackOverRolesWithOwnClickSemantics() {
         // A focused text field elsewhere must not swallow a middle-click
         // on a link or page content.
@@ -36,38 +48,9 @@ final class MiddlePastePolicyTests: XCTestCase {
         XCTAssertFalse(MiddlePastePolicy.shouldPaste(
             cursorRole: "AXGroup", focusedRole: { "AXTextField" }))
         XCTAssertFalse(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXWebArea", focusedRole: { "AXTextField" }))
-    }
-
-    func testTapFallsBackOverRichTextContent() {
-        // Contenteditable editors (ChatGPT, Slack, Notion) hit-test as
-        // AXGroup/AXStaticText while focusing a real editable element. A tap
-        // consumes nothing, so it may claim them.
-        XCTAssertTrue(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXGroup", focusedRole: { "AXTextArea" },
-            allowContentRoleFallback: true))
-        XCTAssertTrue(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXStaticText", focusedRole: { "AXTextField" },
-            allowContentRoleFallback: true))
-    }
-
-    func testTapFallbackStillNeedsAnEditableFocus() {
+            cursorRole: "AXButton", focusedRole: { "AXTextField" }))
         XCTAssertFalse(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXGroup", focusedRole: { "AXWebArea" },
-            allowContentRoleFallback: true))
-        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXGroup", focusedRole: { nil },
-            allowContentRoleFallback: true))
-    }
-
-    func testTapFallbackDoesNotReachClickableRoles() {
-        // Even for a tap, a link or button is a real control — not content.
-        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXLink", focusedRole: { "AXTextField" },
-            allowContentRoleFallback: true))
-        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
-            cursorRole: "AXButton", focusedRole: { "AXTextField" },
-            allowContentRoleFallback: true))
+            cursorRole: "AXTab", focusedRole: { "AXTextField" }))
     }
 
     func testCursorRoleWinsWithoutTouchingFocus() {
