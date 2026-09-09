@@ -40,3 +40,31 @@ jobs:
 
       - name: Run tests
         run: swift test
+
+      - name: Run packaging checks
+        run: python3 -m unittest discover -s tests/packaging -v
+
+      - name: Package arm64 TEST DMG
+        run: scripts/package-test-dmg.sh
+
+      - name: Upload TEST DMG
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Marker-arm64-TEST-unnotarized-${{ github.sha }}
+          path: |
+            build/test-dist/*.dmg
+            build/test-dist/*.dmg.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summarize TEST artifact
+        run: |
+          {
+            echo '### Marker arm64 TEST DMG'
+            echo
+            echo '> **TEST ONLY:** ad-hoc signed (no Developer ID; treat as unsigned), not notarized, and subject to Gatekeeper/TCC limitations.'
+            echo
+            echo 'This uses Marker’s normal history and settings. Accepting its Move-to-Applications dialog can replace an installed Marker.'
+            echo
+            echo "[Download from this workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}#artifacts)"
+          } >> "$GITHUB_STEP_SUMMARY"
