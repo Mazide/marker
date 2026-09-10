@@ -3,6 +3,7 @@ name: Signed macOS build
 on:
   push:
     branches: [main, ci/macos-build-test]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   signed-build:
-    if: github.repository == 'Mazide/marker' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci/macos-build-test')
+    if: github.repository == 'Mazide/marker' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci/macos-build-test' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: macos-15
     timeout-minutes: 60
     defaults:
@@ -28,6 +29,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Validate release version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 scripts/validate-release-tag.py "$GITHUB_REF_NAME"
 
       - name: Run tests
         run: swift test
@@ -104,3 +109,34 @@ jobs:
             build/dist/*.dmg.sha256
           if-no-files-found: error
           retention-days: 14
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: signed-build
+    if: github.repository == 'Mazide/marker' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified signed DMG
+        env:
+          ARTIFACT_NAME: Marker-arm64-signed-notarized-${{ github.sha }}
+        run: gh run download "$GITHUB_RUN_ID" --name "$ARTIFACT_NAME" --dir dist
+
+      - name: Publish tagged release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          cd dist
+          dmg="marker-$version.dmg"
+          test -s "$dmg"
+          test -s "$dmg.sha256"
+          sha256sum --check "$dmg.sha256"
+          gh release create "$GITHUB_REF_NAME" "$dmg" "$dmg.sha256" \
+            --verify-tag --title "Marker $GITHUB_REF_NAME" --generate-notes
