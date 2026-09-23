@@ -12,9 +12,17 @@ final class MiddleClickTap {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var swallowNextUp = false
+    private var startAttempted = false
+
+    var diagnosticState: String {
+        guard startAttempted else { return "stopped" }
+        guard let tap else { return "creation_failed" }
+        return CGEvent.tapIsEnabled(tap: tap) ? "enabled" : "disabled"
+    }
 
     func start() {
         guard tap == nil else { return }
+        startAttempted = true
         let mask = (1 << CGEventType.otherMouseDown.rawValue)
             | (1 << CGEventType.otherMouseUp.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
@@ -32,12 +40,14 @@ final class MiddleClickTap {
         )
         guard let tap else {
             markerLog.error("middle-click tap creation failed")
+            diagLog("input.event_tap.failed tap=middle_click reason=creation_failed")
             return
         }
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        diagLog("input.event_tap.started tap=middle_click")
     }
 
     /// The tap exists but the system has switched it off — the silent
@@ -71,7 +81,7 @@ final class MiddleClickTap {
         }
         let button = event.getIntegerValueField(.mouseEventButtonNumber)
         if type == .otherMouseDown {
-            diagLog("otherMouseDown button=\(button)")
+            diagLog("input.middle_click.received button=\(button)")
         }
         guard button == 2 else {
             return Unmanaged.passUnretained(event)
@@ -79,6 +89,7 @@ final class MiddleClickTap {
         switch type {
         case .otherMouseDown:
             swallowNextUp = onMiddleClick?(event.location) ?? false
+            diagLog("input.middle_click.handled swallowed=\(swallowNextUp)")
             return swallowNextUp ? nil : Unmanaged.passUnretained(event)
         case .otherMouseUp where swallowNextUp:
             swallowNextUp = false

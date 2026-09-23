@@ -90,3 +90,16 @@
 "three-finger click" = "клик тремя пальцами";
 "three-finger double tap" = "двойной тап тремя пальцами";
 "middle-click" = "среднюю кнопку";
+
+/* Diagnostic reports */
+"Troubleshooting" = "Решение проблем";
+"Record diagnostics" = "Записывать диагностику";
+"Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents." = "Включите запись, повторите проблему, затем сохраните отчёт. Записываются решения по разрешениям, захвату, горячим клавишам и вставке; выделенный текст и содержимое буфера обмена — никогда.";
+"Save Diagnostic Report…" = "Сохранить диагностический отчёт…";
+"Show Current Log in Finder" = "Показать текущий журнал в Finder";
+"Couldn't Save Diagnostic Report" = "Не удалось сохранить диагностический отчёт";
+"Marker couldn't save the diagnostic report." = "Приложению Marker не удалось сохранить диагностический отчёт.";
+"Couldn't Show Diagnostic Log" = "Не удалось показать журнал диагностики";
+"Marker couldn't reveal the current diagnostic log in Finder." = "Приложению Marker не удалось показать текущий журнал диагностики в Finder.";
+"Couldn't Record Diagnostics" = "Не удалось записать диагностику";
+"No diagnostic log has been recorded yet." = "Журнал диагностики ещё не был записан.";

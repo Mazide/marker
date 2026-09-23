@@ -17,6 +17,7 @@ private struct GeneralSettingsView: View {
     @Environment(\.markerTheme) private var theme
     @State private var autoUpdates = AppModel.shared.autoUpdatesEnabled
     @State private var cliStatus = CLIInstaller.Status.missing
+    @State private var diagnosticAlert: DiagnosticAlert?
 
     private var cliCaption: String {
         switch cliStatus {
@@ -37,6 +38,22 @@ private struct GeneralSettingsView: View {
         .foregroundStyle(theme.text)
         .tint(theme.accent)
         .background(theme.chip)
+        .alert(item: $diagnosticAlert) { alert in
+            Alert(
+                title: Text(verbatim: alert.title),
+                message: Text(verbatim: alert.message),
+                dismissButton: .default(Text("OK")) {
+                    model.diagnosticLogError = nil
+                }
+            )
+        }
+        .onChange(of: model.diagnosticLogError, initial: true) { _, message in
+            guard let message else { return }
+            diagnosticAlert = DiagnosticAlert(
+                title: String(localized: "Couldn't Record Diagnostics"),
+                message: message
+            )
+        }
     }
 
     private var form: some View {
@@ -225,10 +242,17 @@ private struct GeneralSettingsView: View {
 
             Section("Troubleshooting") {
                 SettingToggle(
-                    "Log paste diagnostics to a file",
-                    caption: "Records why each middle-click did or didn't paste in ~/Library/Logs/Marker.log. No clipboard content is written.",
+                    "Record diagnostics",
+                    caption: "Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents.",
                     isOn: Bindable(model).diagLogEnabled
                 )
+                Button("Save Diagnostic Report…") {
+                    saveDiagnosticReport()
+                }
+                Button("Show Current Log in Finder") {
+                    showCurrentDiagnosticLog()
+                }
+                .help(model.diagnosticLogURL.path(percentEncoded: false))
             }
             .listRowBackground(theme.surface)
 
@@ -288,6 +312,40 @@ private struct GeneralSettingsView: View {
         model.excludedBundleIDs.append(bundleID)
     }
 
+    private func saveDiagnosticReport() {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = "Marker-Diagnostics-\(formatter.string(from: Date())).txt"
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        do {
+            try model.exportDiagnosticLog(to: destination)
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+        } catch {
+            diagnosticAlert = DiagnosticAlert(
+                title: String(localized: "Couldn't Save Diagnostic Report"),
+                message: "\(String(localized: "Marker couldn't save the diagnostic report."))\n\n\(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func showCurrentDiagnosticLog() {
+        do {
+            try model.revealDiagnosticLog()
+        } catch {
+            diagnosticAlert = DiagnosticAlert(
+                title: String(localized: "Couldn't Show Diagnostic Log"),
+                message: "\(String(localized: "Marker couldn't reveal the current diagnostic log in Finder."))\n\n\(error.localizedDescription)"
+            )
+        }
+    }
+
     private static func appDisplayName(for bundleID: String) -> String {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return bundleID
@@ -306,6 +364,12 @@ private struct GeneralSettingsView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
     }
+}
+
+private struct DiagnosticAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }
 
 /// Click-to-record shortcut field. While recording, a local key monitor

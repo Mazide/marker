@@ -137,7 +137,7 @@ final class CaptureEngine {
             pendingCommit = nil
             // Allow the same text to be captured again later on purpose.
             lastReported = nil
-            markerLog.info("dropped select-to-edit capture")
+            diagLog("dropped select-to-edit capture")
         }
     }
 
@@ -154,7 +154,7 @@ final class CaptureEngine {
             pending.token.cancel()
             pendingCommit = nil
             lastReported = nil
-            markerLog.info("dropped select-to-replace capture (paste)")
+            diagLog("dropped select-to-replace capture (paste)")
         }
     }
 
@@ -204,11 +204,11 @@ final class CaptureEngine {
 
     private func captureFromAXNotification() {
         if now().timeIntervalSince(lastGestureCapture) < config.notificationQuiet {
-            markerLog.debug("skip: notification right after a gesture capture")
+            diagLog("skip: notification right after a gesture capture")
             return
         }
         if now().timeIntervalSince(lastExternalPaste) < config.pasteQuiet {
-            markerLog.info("skip: notification right after our own paste")
+            diagLog("skip: notification right after our own paste")
             return
         }
         // Capture is mouse-only: drags and multi-clicks arrive via the
@@ -222,7 +222,7 @@ final class CaptureEngine {
         let shiftClickIntent = lastMouseDownWasShift
             && now().timeIntervalSince(lastMouseDown) < config.intentWindow
         guard shiftClickIntent else {
-            markerLog.debug("skip: notification without a shift+click behind it")
+            diagLog("skip: notification without a shift+click behind it")
             return
         }
         guard let app = frontmost.frontmostApp(), !app.isSelf,
@@ -231,7 +231,7 @@ final class CaptureEngine {
         else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !recentCaptures.contains(trimmed) else {
-            markerLog.info("skip: re-reported selection (\(trimmed.count) chars)")
+            diagLog("skip: re-reported selection (\(trimmed.count) chars)")
             return
         }
         capture(text, app: app, viaAX: true)
@@ -261,7 +261,7 @@ final class CaptureEngine {
                 return
             }
             if trimmed == downSelection {
-                markerLog.info("gesture: AX text unchanged since mouse-down, trying fallback")
+                diagLog("gesture: AX text unchanged since mouse-down, trying fallback")
             }
         }
         // Copy-preferred apps stay fallback-eligible even once proven:
@@ -280,7 +280,7 @@ final class CaptureEngine {
                 downSnapshot = nil
             }
             if let content {
-                markerLog.info("app self-copied \(content.plain.count) chars")
+                diagLog("app self-copied \(content.plain.count) chars")
                 captureFromGesture(content.plain, app: app, viaAX: false, flavors: content)
             }
             return
@@ -308,7 +308,7 @@ final class CaptureEngine {
     /// AX selection to commit if the copy never lands (page suppresses
     /// Cmd+C) — plain beats losing the capture.
     private func fallbackCopy(app: SourceApp, backstop: String? = nil) {
-        markerLog.debug("fallback Cmd+C for \(app.name, privacy: .public)")
+        diagLog("fallback Cmd+C app=\(app.bundleID)")
         let before = pasteboard.changeCount
         let saved = pasteboard.snapshot()
         keys.postCopy()
@@ -323,7 +323,7 @@ final class CaptureEngine {
                 let content = self.pasteboard.containsFileURLs() ? nil : self.pasteboard.readContent()
                 self.pasteboard.restore(saved)
                 if let content {
-                    markerLog.info("fallback captured \(content.plain.count) chars")
+                    diagLog("fallback captured \(content.plain.count) chars")
                     self.captureFromGesture(content.plain, app: app, viaAX: false, flavors: content)
                 } else if let backstop {
                     self.captureFromGesture(backstop, app: app, viaAX: true)
@@ -332,7 +332,7 @@ final class CaptureEngine {
                 self.poll(app: app, before: before, saved: saved, attemptsLeft: attemptsLeft - 1, backstop: backstop)
             } else {
                 // Nothing was copied; clipboard untouched, nothing to restore.
-                markerLog.debug("fallback: clipboard never changed")
+                diagLog("fallback: clipboard never changed")
                 if let backstop {
                     self.captureFromGesture(backstop, app: app, viaAX: true)
                 }
@@ -397,7 +397,7 @@ final class CaptureEngine {
                 content.rtf = rich.rtf
                 content.html = rich.html
             } else {
-                markerLog.info("rich: plain mismatch, ax=\(text.count) rich=\(rich.plain.count)")
+                diagLog("rich: plain mismatch, ax=\(text.count) rich=\(rich.plain.count)")
             }
         }
 
@@ -419,7 +419,7 @@ final class CaptureEngine {
     }
 
     private func commit(_ content: RichText, app: SourceApp, viaAX: Bool) {
-        markerLog.info("captured \(content.plain.count) chars viaAX=\(viaAX) rich=\(content.hasFlavors)")
+        diagLog("captured \(content.plain.count) chars viaAX=\(viaAX) rich=\(content.hasFlavors)")
         onCapture?(content, app, viaAX)
     }
 }

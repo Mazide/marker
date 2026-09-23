@@ -16,28 +16,32 @@ final class PasteEngine {
     private let scheduler: Scheduling
     private let config: Config
     private let now: () -> Date
+    private let log: (String) -> Void
 
     init(
         pasteboard: PasteboardControlling,
         keys: KeyEventSynthesizing,
         scheduler: Scheduling,
         config: Config = Config(),
-        now: @escaping () -> Date = { Date() }
+        now: @escaping () -> Date = { Date() },
+        log: @escaping (String) -> Void = diagLog
     ) {
         self.pasteboard = pasteboard
         self.keys = keys
         self.scheduler = scheduler
         self.config = config
         self.now = now
+        self.log = log
     }
 
     func pasteIntoActiveApp(_ text: String) {
         pasteIntoActiveApp(RichText(plain: text))
     }
 
-    func pasteIntoActiveApp(_ content: RichText) {
+    func pasteIntoActiveApp(_ content: RichText, operationID: String = UUID().uuidString.lowercased()) {
+        log("paste.scheduled operation=\(operationID) chars=\(content.plain.count) rich=\(content.hasFlavors)")
         waitForModifierRelease(deadline: now().addingTimeInterval(config.modifierWait)) { [weak self] in
-            self?.performPaste(content)
+            self?.performPaste(content, operationID: operationID)
         }
     }
 
@@ -55,14 +59,16 @@ final class PasteEngine {
     /// ignore the AX churn the paste causes in the target field.
     var onPaste: (() -> Void)?
 
-    private func performPaste(_ content: RichText) {
+    private func performPaste(_ content: RichText, operationID: String) {
         let saved = pasteboard.snapshot()
         pasteboard.writeContent(content)
         markerLog.info("paste: \(content.plain.count) chars via Cmd+V rich=\(content.hasFlavors)")
         onPaste?()
         keys.postPaste()
-        scheduler.schedule(after: config.restoreDelay) { [pasteboard] in
+        log("paste.committed operation=\(operationID)")
+        scheduler.schedule(after: config.restoreDelay) { [pasteboard, log] in
             pasteboard.restore(saved)
+            log("paste.clipboard_restored operation=\(operationID)")
         }
     }
 }

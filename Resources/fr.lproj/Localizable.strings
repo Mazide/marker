@@ -90,3 +90,16 @@
 "three-finger click" = "clic à trois doigts";
 "three-finger double tap" = "double toucher à trois doigts";
 "middle-click" = "clic du milieu";
+
+/* Diagnostic reports */
+"Troubleshooting" = "Dépannage";
+"Record diagnostics" = "Enregistrer les diagnostics";
+"Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents." = "Activez, reproduisez le problème, puis enregistrez un rapport. Consigne les décisions d’autorisation, de capture, de raccourci et de collage, jamais le contenu de la sélection ni du presse-papiers.";
+"Save Diagnostic Report…" = "Enregistrer le rapport de diagnostic…";
+"Show Current Log in Finder" = "Afficher le journal actuel dans le Finder";
+"Couldn't Save Diagnostic Report" = "Impossible d’enregistrer le rapport de diagnostic";
+"Marker couldn't save the diagnostic report." = "Marker n’a pas pu enregistrer le rapport de diagnostic.";
+"Couldn't Show Diagnostic Log" = "Impossible d’afficher le journal de diagnostic";
+"Marker couldn't reveal the current diagnostic log in Finder." = "Marker n’a pas pu afficher le journal de diagnostic actuel dans le Finder.";
+"Couldn't Record Diagnostics" = "Impossible d’enregistrer les diagnostics";
+"No diagnostic log has been recorded yet." = "Aucun journal de diagnostic n’a encore été enregistré.";

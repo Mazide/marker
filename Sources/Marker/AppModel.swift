@@ -88,13 +88,27 @@ final class AppModel {
         didSet { UserDefaults.standard.set(middleClickPasteEnabled, forKey: "middleClickPasteEnabled") }
     }
 
-    /// File trail for the click-paste path (~/Library/Logs/Marker.log), so
-    /// a "middle-click didn't paste" report can be diagnosed by copying one
-    /// file. Off by default.
+    /// Privacy-safe local trail for remote troubleshooting. It contains
+    /// decisions, reason codes, and aggregate lengths, never selection or
+    /// clipboard contents. Off by default until the tester opts in.
+    @ObservationIgnored private var isRestoringDiagnosticSetting = false
+    var diagnosticLogError: String?
     var diagLogEnabled: Bool = UserDefaults.standard.bool(forKey: "diagLogEnabled") {
         didSet {
-            UserDefaults.standard.set(diagLogEnabled, forKey: "diagLogEnabled")
-            DiagFile.shared.enabled = diagLogEnabled
+            guard !isRestoringDiagnosticSetting, oldValue != diagLogEnabled else { return }
+            do {
+                try DiagFile.shared.setEnabled(diagLogEnabled)
+                if diagLogEnabled {
+                    recordDiagnosticSnapshot(event: "app.session.diagnostics_enabled")
+                }
+                UserDefaults.standard.set(diagLogEnabled, forKey: "diagLogEnabled")
+                diagnosticLogError = nil
+            } catch {
+                isRestoringDiagnosticSetting = true
+                diagLogEnabled = oldValue
+                isRestoringDiagnosticSetting = false
+                diagnosticLogError = error.localizedDescription
+            }
         }
     }
 
@@ -207,6 +221,14 @@ final class AppModel {
     }
 
     func start() {
+        if diagLogEnabled {
+            do {
+                try DiagFile.shared.beginSession()
+            } catch {
+                diagnosticLogError = error.localizedDescription
+            }
+        }
+        recordDiagnosticSnapshot(event: "app.session.started")
         axMonitor.onSelectionChanged = { [weak self] in
             self?.engine.axSelectionChanged()
         }
@@ -248,27 +270,36 @@ final class AppModel {
             guard let self else { return }
             switch key {
             case .pasteLatest:
-                guard let item = self.itemToPaste() else { return }
-                self.pasteEngine.pasteIntoActiveApp(item.content)
+                let operation = self.recordPasteRequest(trigger: "hotkey")
+                guard let item = self.itemToPaste() else {
+                    diagLog("paste.resolved operation=\(operation) outcome=rejected reason=nothing_to_paste")
+                    return
+                }
+                self.pasteEngine.pasteIntoActiveApp(item.content, operationID: operation)
             case .showHistory:
+                diagLog("history.panel.request trigger=hotkey")
                 HistoryPanelPresenter.shared.toggle()
             }
         }
         middleClickTap.onMiddleClick = { [weak self] _ in
             guard let self else { return false }
+            let operation = self.recordPasteRequest(trigger: "middle_click")
             guard self.middleClickPasteEnabled, self.axTrusted else {
-                diagLog("middle-click ignored: enabled=\(self.middleClickPasteEnabled) axTrusted=\(self.axTrusted)")
+                let reason = self.middleClickPasteEnabled ? "accessibility_not_granted" : "feature_disabled"
+                diagLog("paste.resolved operation=\(operation) outcome=rejected reason=\(reason)")
                 return false
             }
-            guard self.shouldPasteAtCursor(input: "middle-click") else { return false }
+            guard self.shouldPasteAtCursor(input: "middle-click") else {
+                diagLog("paste.resolved operation=\(operation) outcome=rejected reason=cursor_role_not_editable")
+                return false
+            }
             guard let item = self.itemToPaste() else {
-                diagLog("middle-click ignored: nothing to paste (PastePolicy)")
+                diagLog("paste.resolved operation=\(operation) outcome=rejected reason=nothing_to_paste")
                 return false
             }
             // Paste into the current focus, same as ⌥V.
             self.pendingPasteFeedbackAnchor = NSEvent.mouseLocation
-            self.pasteEngine.pasteIntoActiveApp(item.content)
-            diagLog("middle-click pasted \(item.text.count) chars")
+            self.pasteEngine.pasteIntoActiveApp(item.content, operationID: operation)
             return true
         }
         threeFingerClickTap.fingersTouching = { [weak self] in
@@ -371,6 +402,22 @@ final class AppModel {
         } else {
             pollForTrust()
         }
+    }
+
+    var diagnosticLogURL: URL {
+        DiagFile.shared.fileURL
+    }
+
+    func exportDiagnosticLog(to destination: URL) throws {
+        try DiagFile.shared.export(to: destination, snapshot: diagnosticSnapshot)
+    }
+
+    func revealDiagnosticLog() throws {
+        let url = diagnosticLogURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw DiagnosticLogPresentationError.reportNotFound
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     func checkForUpdates() {
@@ -536,15 +583,22 @@ final class AppModel {
     /// and the focused element is only a fallback.
     private func shouldPasteAtCursor(input: String) -> Bool {
         let cursorRole = axMonitor.roleAtMouseLocation()
-        guard MiddlePastePolicy.shouldPaste(
+        var focusedRole: String?
+        var usedFocusedRole = false
+        let accepted = MiddlePastePolicy.shouldPaste(
             cursorRole: cursorRole,
-            focusedRole: { self.axMonitor.focusedElementRole() }
-        ) else {
-            let focused = axMonitor.focusedElementRole() ?? "nil"
-            diagLog("\(input) ignored: cursor=\(cursorRole ?? "nil") focused=\(focused)")
-            return false
-        }
-        return true
+            focusedRole: {
+                usedFocusedRole = true
+                focusedRole = self.axMonitor.focusedElementRole()
+                return focusedRole
+            }
+        )
+        diagLog(
+            "paste.role_check input=\(input) accepted=\(accepted) "
+                + "cursor_role=\(cursorRole ?? "nil") "
+                + "focused_role=\(usedFocusedRole ? (focusedRole ?? "nil") : "not_queried")"
+        )
+        return accepted
     }
 
     /// Recreate the input monitors after a wake. Safe to run even if they
@@ -576,11 +630,47 @@ final class AppModel {
                 guard let self else { return }
                 markerLog.info("AX trust granted, starting watcher")
                 self.axTrusted = true
+                diagLog("permission.accessibility.changed trusted=true")
                 self.axMonitor.start()
                 self.mouseMonitor.start()
                 self.middleClickTap.start()
                 self.threeFingerClickTap.start()
             }
+        }
+    }
+
+    private func recordDiagnosticSnapshot(event: String) {
+        diagLog("\(event) \(diagnosticSnapshot)")
+    }
+
+    private func recordPasteRequest(trigger: String) -> String {
+        let operation = UUID().uuidString.lowercased()
+        let app = frontmost.frontmostApp()
+        diagLog(
+            "paste.request operation=\(operation) trigger=\(trigger) "
+                + "app=\(app?.bundleID ?? "unknown") pid=\(app?.pid ?? 0) "
+                + diagnosticSnapshot
+        )
+        return operation
+    }
+
+    private var diagnosticSnapshot: String {
+        "ax_trusted=\(axTrusted) "
+                + "middle_click=\(middleClickPasteEnabled) "
+                + "middle_click_tap=\(middleClickTap.diagnosticState) "
+                + "three_finger=\(threeFingerPasteMode.rawValue) "
+                + "rich_copy=\(richCopyEnabled) skip_secrets=\(skipSecretsEnabled)"
+    }
+
+}
+
+private enum DiagnosticLogPresentationError: LocalizedError {
+    case reportNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .reportNotFound:
+            return String(localized: "No diagnostic log has been recorded yet.")
         }
     }
 }

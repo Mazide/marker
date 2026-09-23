@@ -90,3 +90,16 @@
 "three-finger click" = "3本指クリック";
 "three-finger double tap" = "3本指ダブルタップ";
 "middle-click" = "中クリック";
+
+/* Diagnostic reports */
+"Troubleshooting" = "トラブルシューティング";
+"Record diagnostics" = "診断情報を記録";
+"Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents." = "有効にして問題を再現し、レポートを保存します。権限、取り込み、ショートカット、貼り付けの判断を記録しますが、選択内容やクリップボードの内容は記録しません。";
+"Save Diagnostic Report…" = "診断レポートを保存…";
+"Show Current Log in Finder" = "現在のログを Finder に表示";
+"Couldn't Save Diagnostic Report" = "診断レポートを保存できませんでした";
+"Marker couldn't save the diagnostic report." = "Marker は診断レポートを保存できませんでした。";
+"Couldn't Show Diagnostic Log" = "診断ログを表示できませんでした";
+"Marker couldn't reveal the current diagnostic log in Finder." = "Marker は現在の診断ログを Finder に表示できませんでした。";
+"Couldn't Record Diagnostics" = "診断情報を記録できませんでした";
+"No diagnostic log has been recorded yet." = "診断ログはまだ記録されていません。";
