@@ -90,3 +90,16 @@
 "three-finger click" = "three-finger click";
 "three-finger double tap" = "three-finger double tap";
 "middle-click" = "middle-click";
+
+/* Diagnostic reports */
+"Troubleshooting" = "Troubleshooting";
+"Record diagnostics" = "Record diagnostics";
+"Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents." = "Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents.";
+"Save Diagnostic Report…" = "Save Diagnostic Report…";
+"Show Current Log in Finder" = "Show Current Log in Finder";
+"Couldn't Save Diagnostic Report" = "Couldn't Save Diagnostic Report";
+"Marker couldn't save the diagnostic report." = "Marker couldn't save the diagnostic report.";
+"Couldn't Show Diagnostic Log" = "Couldn't Show Diagnostic Log";
+"Marker couldn't reveal the current diagnostic log in Finder." = "Marker couldn't reveal the current diagnostic log in Finder.";
+"Couldn't Record Diagnostics" = "Couldn't Record Diagnostics";
+"No diagnostic log has been recorded yet." = "No diagnostic log has been recorded yet.";

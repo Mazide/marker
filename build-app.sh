@@ -4,6 +4,22 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+if [[ -L build ]]; then
+  echo "!! Refusing to use symlinked build directory." >&2
+  exit 1
+fi
+
+SIGN_ARGS=(--timestamp --sign "${MARKER_SIGN_IDENTITY:-Developer ID Application}")
+if (( $# == 0 )); then
+  : # Existing Developer ID behavior remains the default.
+elif (( $# == 1 )) && [[ "$1" == "--test-ad-hoc-sign" ]]; then
+  SIGN_ARGS=(--sign -)
+  echo "WARNING: using TEST-ONLY ad-hoc signing; this build is not notarized." >&2
+else
+  echo "Usage: $0 [--test-ad-hoc-sign]" >&2
+  exit 2
+fi
+
 # Const-value emission feeds appintentsmetadataprocessor below — without
 # it App Intents are invisible to Shortcuts/Spotlight (SwiftPM has no
 # built-in App Intents extraction; this replicates Xcode's build phase).
@@ -36,9 +52,10 @@ cp -R Resources/*.lproj "$APP/Contents/Resources/"
 find "$PWD/Sources/Marker" -name '*.swift' > "$AIM_TMP/srcs.txt"
 echo "$PWD/.build/arm64-apple-macosx/release/Marker.build/Marker.swiftconstvalues" \
   > "$AIM_TMP/constvals.txt"
+SELECTED_TOOLCHAIN="$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain"
 xcrun appintentsmetadataprocessor \
   --output "$APP/Contents/Resources" \
-  --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain \
+  --toolchain-dir "$SELECTED_TOOLCHAIN" \
   --module-name Marker \
   --sdk-root "$(xcrun --show-sdk-path --sdk macosx)" \
   --xcode-version "$(xcodebuild -version | tail -1 | awk '{print $3}')" \
@@ -58,14 +75,14 @@ SPARKLE_FW="$(find .build/artifacts -name Sparkle.framework -type d | head -1)"
 cp -R "$SPARKLE_FW" "$APP/Contents/Frameworks/"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Marker" 2>/dev/null || true
 
-# Sign with a real identity: ad-hoc signatures change cdhash on every
-# rebuild, which silently revokes the Accessibility (TCC) grant.
-IDENTITY="${MARKER_SIGN_IDENTITY:-Developer ID Application}"
-codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" \
+# The default uses a real identity: ad-hoc signatures change cdhash on every
+# rebuild, which silently revokes the Accessibility (TCC) grant. The explicit
+# test flag above is intentionally unsuitable for an installed daily build.
+codesign --force --deep --options runtime "${SIGN_ARGS[@]}" \
   "$APP/Contents/Frameworks/Sparkle.framework"
-codesign --force --options runtime --timestamp --sign "$IDENTITY" \
+codesign --force --options runtime "${SIGN_ARGS[@]}" \
   "$APP/Contents/MacOS/marker-cli"
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+codesign --force --options runtime "${SIGN_ARGS[@]}" "$APP"
 
 echo "Built $APP"
 echo "Run: open $APP"

@@ -16,29 +16,50 @@ final class PasteEngine {
     private let scheduler: Scheduling
     private let config: Config
     private let now: () -> Date
+    private let log: (String) -> Void
 
     init(
         pasteboard: PasteboardControlling,
         keys: KeyEventSynthesizing,
         scheduler: Scheduling,
         config: Config = Config(),
-        now: @escaping () -> Date = { Date() }
+        now: @escaping () -> Date = { Date() },
+        log: @escaping (String) -> Void = diagLog
     ) {
         self.pasteboard = pasteboard
         self.keys = keys
         self.scheduler = scheduler
         self.config = config
         self.now = now
+        self.log = log
     }
 
     func pasteIntoActiveApp(_ text: String) {
         pasteIntoActiveApp(RichText(plain: text))
     }
 
-    func pasteIntoActiveApp(_ content: RichText) {
-        waitForModifierRelease(deadline: now().addingTimeInterval(config.modifierWait)) { [weak self] in
-            self?.performPaste(content)
+    @discardableResult
+    func pasteIntoActiveApp(
+        _ content: RichText,
+        operationID: String = UUID().uuidString.lowercased(),
+        ifStillValid: @escaping () -> Bool = { true },
+        onCommit: @escaping () -> Void = {}
+    ) -> Bool {
+        guard ifStillValid() else {
+            log("paste.resolved operation=\(operationID) outcome=rejected reason=invalid_target")
+            return false
         }
+        log("paste.scheduled operation=\(operationID) chars=\(content.plain.count) rich=\(content.hasFlavors)")
+        var accepted = true
+        waitForModifierRelease(deadline: now().addingTimeInterval(config.modifierWait)) { [weak self] in
+            accepted = self?.performPaste(
+                content,
+                operationID: operationID,
+                ifStillValid: ifStillValid,
+                onCommit: onCommit
+            ) ?? false
+        }
+        return accepted
     }
 
     private func waitForModifierRelease(deadline: Date, then action: @escaping () -> Void) {
@@ -55,14 +76,36 @@ final class PasteEngine {
     /// ignore the AX churn the paste causes in the target field.
     var onPaste: (() -> Void)?
 
-    private func performPaste(_ content: RichText) {
-        let saved = pasteboard.snapshot()
-        pasteboard.writeContent(content)
-        markerLog.info("paste: \(content.plain.count) chars via Cmd+V rich=\(content.hasFlavors)")
-        onPaste?()
-        keys.postPaste()
-        scheduler.schedule(after: config.restoreDelay) { [pasteboard] in
-            pasteboard.restore(saved)
+    private func performPaste(
+        _ content: RichText,
+        operationID: String,
+        ifStillValid: () -> Bool,
+        onCommit: () -> Void
+    ) -> Bool {
+        guard ifStillValid() else {
+            log("paste.resolved operation=\(operationID) outcome=rejected reason=target_changed_while_waiting")
+            return false
         }
+        let saved = pasteboard.snapshot()
+        guard ifStillValid() else {
+            log("paste.resolved operation=\(operationID) outcome=rejected reason=target_changed_during_snapshot")
+            return false
+        }
+        pasteboard.writeContent(content)
+        guard ifStillValid() else {
+            pasteboard.restore(saved)
+            log("paste.resolved operation=\(operationID) outcome=rejected reason=target_changed_before_dispatch")
+            return false
+        }
+        markerLog.info("paste: \(content.plain.count) chars via Cmd+V rich=\(content.hasFlavors)")
+        keys.postPaste()
+        log("paste.committed operation=\(operationID)")
+        onCommit()
+        onPaste?()
+        scheduler.schedule(after: config.restoreDelay) { [pasteboard, log] in
+            pasteboard.restore(saved)
+            log("paste.clipboard_restored operation=\(operationID)")
+        }
+        return true
     }
 }

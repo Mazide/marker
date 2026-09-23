@@ -90,3 +90,16 @@
 "three-finger click" = "clic con tres dedos";
 "three-finger double tap" = "doble toque con tres dedos";
 "middle-click" = "clic central";
+
+/* Diagnostic reports */
+"Troubleshooting" = "Solución de problemas";
+"Record diagnostics" = "Registrar diagnósticos";
+"Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents." = "Actívalo, reproduce el problema y guarda un informe. Registra decisiones sobre permisos, captura, atajos y pegado; nunca el contenido de la selección ni del portapapeles.";
+"Save Diagnostic Report…" = "Guardar informe de diagnóstico…";
+"Show Current Log in Finder" = "Mostrar el registro actual en Finder";
+"Couldn't Save Diagnostic Report" = "No se pudo guardar el informe de diagnóstico";
+"Marker couldn't save the diagnostic report." = "Marker no pudo guardar el informe de diagnóstico.";
+"Couldn't Show Diagnostic Log" = "No se pudo mostrar el registro de diagnóstico";
+"Marker couldn't reveal the current diagnostic log in Finder." = "Marker no pudo mostrar el registro de diagnóstico actual en Finder.";
+"Couldn't Record Diagnostics" = "No se pudieron registrar los diagnósticos";
+"No diagnostic log has been recorded yet." = "Aún no se ha registrado ningún diagnóstico.";

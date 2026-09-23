@@ -90,3 +90,16 @@
 "three-finger click" = "三指点按";
 "three-finger double tap" = "三指轻点两下";
 "middle-click" = "中键点击";
+
+/* Diagnostic reports */
+"Troubleshooting" = "故障排除";
+"Record diagnostics" = "记录诊断信息";
+"Turn this on, reproduce the problem, then save a report. Records permission, capture, hotkey, and paste decisions; never selection or clipboard contents." = "开启后重现问题，再保存报告。仅记录权限、捕获、快捷键和粘贴决策，绝不记录所选内容或剪贴板内容。";
+"Save Diagnostic Report…" = "存储诊断报告…";
+"Show Current Log in Finder" = "在“访达”中显示当前日志";
+"Couldn't Save Diagnostic Report" = "无法存储诊断报告";
+"Marker couldn't save the diagnostic report." = "Marker 无法存储诊断报告。";
+"Couldn't Show Diagnostic Log" = "无法显示诊断日志";
+"Marker couldn't reveal the current diagnostic log in Finder." = "Marker 无法在“访达”中显示当前诊断日志。";
+"Couldn't Record Diagnostics" = "无法记录诊断信息";
+"No diagnostic log has been recorded yet." = "尚未记录诊断日志。";

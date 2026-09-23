@@ -120,4 +120,131 @@ final class PasteEngineTests: XCTestCase {
         // If the snapshot were taken after the write, restore would put back "new selection" instead.
         XCTAssertEqual(pasteboard.restoredValues, ["previous"])
     }
+
+    func testDiagnosticsCorrelateDelayedPasteWithoutRecordingContent() {
+        var events: [String] = []
+        engine = PasteEngine(
+            pasteboard: pasteboard,
+            keys: keys,
+            scheduler: scheduler,
+            now: { [unowned self] in self.clock },
+            log: { [unowned self] message in
+                if message.hasPrefix("paste.committed") {
+                    XCTAssertEqual(self.keys.pasteCount, 1, "Commit must follow event dispatch")
+                }
+                events.append(message)
+            }
+        )
+        pasteboard.writeString("private previous clipboard")
+        keys.modifiersHeld = true
+
+        engine.pasteIntoActiveApp(
+            RichText(plain: "private selected content"),
+            operationID: "repro-123"
+        )
+
+        XCTAssertEqual(events.count, 1)
+        XCTAssertTrue(events[0].hasPrefix("paste.scheduled operation=repro-123"))
+        XCTAssertEqual(keys.pasteCount, 0)
+
+        keys.modifiersHeld = false
+        scheduler.runNext()
+        XCTAssertEqual(events.last, "paste.committed operation=repro-123")
+        scheduler.runAll()
+        XCTAssertEqual(events.last, "paste.clipboard_restored operation=repro-123")
+        XCTAssertEqual(pasteboard.current, "private previous clipboard")
+        XCTAssertFalse(events.joined().contains("private"))
+    }
+
+    func testInvalidTargetRejectsWithoutConsumingClickOrTouchingClipboard() {
+        pasteboard.writeString("previous")
+        var committed = false
+        let accepted = engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { false },
+            onCommit: { committed = true }
+        )
+
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertEqual(scheduler.pendingCount, 0)
+        XCTAssertFalse(committed)
+    }
+
+    func testFocusChangeDuringModifierWaitCancelsWithoutRetractionOrFeedback() {
+        pasteboard.writeString("previous")
+        keys.modifiersHeld = true
+        var valid = true
+        var committed = false
+        var feedback = false
+        engine.onPaste = { feedback = true }
+
+        XCTAssertTrue(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { valid },
+            onCommit: { committed = true }
+        ))
+        valid = false
+        keys.modifiersHeld = false
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertTrue(pasteboard.restoredValues.isEmpty, "Cancellation should not write clipboard")
+        XCTAssertFalse(committed, "History retraction must only run after dispatch")
+        XCTAssertFalse(feedback)
+    }
+
+    func testFocusChangeDuringSnapshotDoesNotWriteClipboard() {
+        pasteboard.writeString("previous")
+        var valid = true
+        pasteboard.onSnapshot = { valid = false }
+
+        XCTAssertFalse(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { valid },
+            onCommit: { XCTFail("Cancelled paste must not commit") }
+        ))
+
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertTrue(pasteboard.restoredValues.isEmpty)
+    }
+
+    func testFocusChangeDuringTemporaryWriteRestoresClipboardWithoutPasting() {
+        pasteboard.writeString("previous")
+        var valid = true
+        pasteboard.onWriteContent = { valid = false }
+
+        XCTAssertFalse(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { valid },
+            onCommit: { XCTFail("Cancelled paste must not commit") }
+        ))
+
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertEqual(pasteboard.restoredValues, ["previous"])
+        XCTAssertEqual(scheduler.pendingCount, 0)
+    }
+
+    func testCommitAndFeedbackRunOnlyAfterPasteDispatch() {
+        var events: [String] = []
+        engine.onPaste = { [unowned self] in
+            XCTAssertEqual(self.keys.pasteCount, 1)
+            events.append("feedback")
+        }
+
+        XCTAssertTrue(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { true },
+            onCommit: { [unowned self] in
+                XCTAssertEqual(self.keys.pasteCount, 1)
+                events.append("commit")
+            }
+        ))
+
+        XCTAssertEqual(events, ["commit", "feedback"])
+    }
 }

@@ -9,7 +9,8 @@ import Foundation
 /// even over their text area, and browser pages hit-test their blank canvas
 /// as AXWebArea — for those (or no element at all) the focused element's
 /// role decides instead. Roles that carry their own middle-click semantics
-/// (AXLink, AXButton, AXGroup content) never fall back — a focused text
+/// (AXLink, AXButton) never fall back. Ambiguous groups may paste only
+/// inside the focused editor — a focused text
 /// field elsewhere on the page must not swallow a click on a link.
 enum MiddlePastePolicy {
     static let textRoles: Set<String> = [
@@ -23,6 +24,9 @@ enum MiddlePastePolicy {
     /// the app cared about; at worst it trades autoscroll on empty page
     /// space for a paste into the focused field.
     private static let bareRoles: Set<String?> = ["AXWindow", "AXWebArea", nil]
+    private static let rolesWithOwnMiddleClickMeaning: Set<String> = [
+        "AXLink", "AXButton", "AXTab", "AXMenuItem",
+    ]
 
     static func shouldPaste(role: String?) -> Bool {
         guard let role else { return false }
@@ -30,14 +34,21 @@ enum MiddlePastePolicy {
     }
 
     /// Full decision for click triggers: cursor role first, focused element
-    /// as fallback only when the cursor hit nothing meaningful. Taps don't
+    /// as fallback for bare roles or a proven hit inside that editor. Taps don't
     /// consume a click and skip the cursor entirely — they gate on the
     /// focused role alone via `shouldPaste(role:)`.
     static func shouldPaste(
         cursorRole: String?,
+        cursorInsideFocusedEditable: Bool = false,
         focusedRole: () -> String?
     ) -> Bool {
         if shouldPaste(role: cursorRole) { return true }
+        if let cursorRole, rolesWithOwnMiddleClickMeaning.contains(cursorRole) {
+            return false
+        }
+        if cursorInsideFocusedEditable {
+            return shouldPaste(role: focusedRole())
+        }
         guard bareRoles.contains(cursorRole) else { return false }
         return shouldPaste(role: focusedRole())
     }

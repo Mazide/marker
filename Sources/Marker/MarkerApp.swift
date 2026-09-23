@@ -58,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        diagLog("app.session.stopped")
+        try? DiagFile.shared.flush()
+    }
+
     private static func otherRunningInstance() -> NSRunningApplication? {
         guard let bundleID = Bundle.main.bundleIdentifier else { return nil }
         return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)

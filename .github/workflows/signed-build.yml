@@ -1,0 +1,142 @@
+name: Signed macOS build
+
+on:
+  push:
+    branches: [main, ci/macos-build-test]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signed-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  signed-build:
+    if: github.repository == 'Mazide/marker' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci/macos-build-test' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      MARKER_SIGN_IDENTITY: 'Developer ID Application: Nikita Demidov (3E6P6Z2C4R)'
+      NOTARY_PROFILE: marker-ci
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate release version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 scripts/validate-release-tag.py "$GITHUB_REF_NAME"
+
+      - name: Run tests
+        run: swift test
+
+      - name: Run packaging checks
+        run: python3 -m unittest discover -s tests/packaging -v
+
+      - name: Import signing credentials
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing Actions secret: $name"
+              exit 1
+            fi
+          done
+          certificate="$RUNNER_TEMP/marker-signing.p12"
+          keychain="$RUNNER_TEMP/marker-signing.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security import "$certificate" -P "$APPLE_CERTIFICATE_PASSWORD" -t cert -f pkcs12 -k "$keychain" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          security default-keychain -d user -s "$keychain"
+          rm -f "$certificate"
+          xcrun notarytool store-credentials "$NOTARY_PROFILE" \
+            --keychain "$keychain" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+
+      - name: Build, sign and notarize DMG
+        run: scripts/notarize.sh
+
+      - name: Verify distribution
+        run: |
+          set -euo pipefail
+          codesign --verify --deep --strict --verbose=2 build/Marker.app
+          spctl --assess --type execute --verbose=2 build/Marker.app
+          for dmg in build/dist/*.dmg; do
+            hdiutil verify "$dmg"
+            xcrun stapler validate "$dmg"
+          done
+          cd build/dist
+          for dmg in *.dmg; do
+            shasum -a 256 "$dmg" > "$dmg.sha256"
+          done
+
+      - name: Remove signing credentials
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/marker-signing.p12"
+          if [[ -f "$RUNNER_TEMP/marker-signing.keychain-db" ]]; then
+            security default-keychain -d user -s "$HOME/Library/Keychains/login.keychain-db"
+            security delete-keychain "$RUNNER_TEMP/marker-signing.keychain-db"
+          fi
+
+      - name: Upload signed DMG
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Marker-arm64-signed-notarized-${{ github.sha }}
+          path: |
+            build/dist/*.dmg
+            build/dist/*.dmg.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: signed-build
+    if: github.repository == 'Mazide/marker' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified signed DMG
+        env:
+          ARTIFACT_NAME: Marker-arm64-signed-notarized-${{ github.sha }}
+        run: gh run download "$GITHUB_RUN_ID" --name "$ARTIFACT_NAME" --dir dist
+
+      - name: Publish tagged release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          cd dist
+          dmg="marker-$version.dmg"
+          test -s "$dmg"
+          test -s "$dmg.sha256"
+          sha256sum --check "$dmg.sha256"
+          gh release create "$GITHUB_REF_NAME" "$dmg" "$dmg.sha256" \
+            --verify-tag --title "Marker $GITHUB_REF_NAME" --generate-notes

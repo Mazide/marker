@@ -14,6 +14,8 @@ final class FakePasteboard: PasteboardControlling {
     private(set) var currentHTML: String?
     private(set) var restoredValues: [String?] = []
     var fileURLsOnBoard = false
+    var onSnapshot: (() -> Void)?
+    var onWriteContent: (() -> Void)?
 
     func readString() -> String? { current }
 
@@ -34,10 +36,13 @@ final class FakePasteboard: PasteboardControlling {
         currentRTF = content.rtf
         currentHTML = content.html
         changeCount += 1
+        onWriteContent?()
     }
 
     func snapshot() -> PasteboardSnapshot {
-        Snapshot(value: current, rtf: currentRTF, html: currentHTML)
+        let saved = Snapshot(value: current, rtf: currentRTF, html: currentHTML)
+        onSnapshot?()
+        return saved
     }
 
     func restore(_ snapshot: PasteboardSnapshot) {

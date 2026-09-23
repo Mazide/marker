@@ -100,6 +100,35 @@ watching selections as soon as it is granted — no relaunch needed.
 
 ## Notes & limitations
 
+### Diagnostic reports
+
+For intermittent capture or paste problems, enable **Settings → Troubleshooting →
+Record diagnostics**, reproduce the issue, then choose **Save Diagnostic Report…**.
+Attach the exported `.txt` file with the approximate time, app/version, type of
+field (for example Chrome address bar or a webpage editor), and whether ⌥V worked
+in the same field. A successful middle-click immediately before or after the
+failure helps compare the two paths. You can turn recording off after reproducing.
+
+The report includes timestamped events, Marker/macOS versions, current settings
+and middle-click event-tap state, plus the current and previous rotated logs
+(up to roughly 10 MB combined). Paste events identify the target app by bundle ID
+and process ID for middle-click and hotkey requests. Click decisions include
+accessibility roles under the cursor and the focused-role fallback.
+Selection and clipboard text, page URLs, window titles, and screenshots are not
+collected. The snapshot is diagnostic state, not an image of the screen.
+
+`paste.committed` means Marker dispatched the paste, not that the target app
+confirmed insertion. If recording was off during the failure, export still
+includes current state but cannot reconstruct the missing events. Live logs are
+stored at `~/Library/Logs/Marker.log` and `~/Library/Logs/Marker.previous.log`.
+
+Middle-click accepts ambiguous accessibility elements inside the already focused
+editor, provided the hit belongs to the same foreground app. Links, buttons, tabs,
+and menu items keep their own click behavior. Clicks outside that editor pass
+through; a focus change while waiting for modifiers cancels the pending paste.
+
+### Other limitations
+
 - Apps with poor Accessibility support (some Electron apps, some Java
   apps) may not report selections.
 - History is stored unencrypted in a local SQLite database
