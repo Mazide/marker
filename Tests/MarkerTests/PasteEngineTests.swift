@@ -155,4 +155,96 @@ final class PasteEngineTests: XCTestCase {
         XCTAssertEqual(pasteboard.current, "private previous clipboard")
         XCTAssertFalse(events.joined().contains("private"))
     }
+
+    func testInvalidTargetRejectsWithoutConsumingClickOrTouchingClipboard() {
+        pasteboard.writeString("previous")
+        var committed = false
+        let accepted = engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { false },
+            onCommit: { committed = true }
+        )
+
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertEqual(scheduler.pendingCount, 0)
+        XCTAssertFalse(committed)
+    }
+
+    func testFocusChangeDuringModifierWaitCancelsWithoutRetractionOrFeedback() {
+        pasteboard.writeString("previous")
+        keys.modifiersHeld = true
+        var valid = true
+        var committed = false
+        var feedback = false
+        engine.onPaste = { feedback = true }
+
+        XCTAssertTrue(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { valid },
+            onCommit: { committed = true }
+        ))
+        valid = false
+        keys.modifiersHeld = false
+        scheduler.runAll()
+
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertTrue(pasteboard.restoredValues.isEmpty, "Cancellation should not write clipboard")
+        XCTAssertFalse(committed, "History retraction must only run after dispatch")
+        XCTAssertFalse(feedback)
+    }
+
+    func testFocusChangeDuringSnapshotDoesNotWriteClipboard() {
+        pasteboard.writeString("previous")
+        var valid = true
+        pasteboard.onSnapshot = { valid = false }
+
+        XCTAssertFalse(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { valid },
+            onCommit: { XCTFail("Cancelled paste must not commit") }
+        ))
+
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertTrue(pasteboard.restoredValues.isEmpty)
+    }
+
+    func testFocusChangeDuringTemporaryWriteRestoresClipboardWithoutPasting() {
+        pasteboard.writeString("previous")
+        var valid = true
+        pasteboard.onWriteContent = { valid = false }
+
+        XCTAssertFalse(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { valid },
+            onCommit: { XCTFail("Cancelled paste must not commit") }
+        ))
+
+        XCTAssertEqual(keys.pasteCount, 0)
+        XCTAssertEqual(pasteboard.current, "previous")
+        XCTAssertEqual(pasteboard.restoredValues, ["previous"])
+        XCTAssertEqual(scheduler.pendingCount, 0)
+    }
+
+    func testCommitAndFeedbackRunOnlyAfterPasteDispatch() {
+        var events: [String] = []
+        engine.onPaste = { [unowned self] in
+            XCTAssertEqual(self.keys.pasteCount, 1)
+            events.append("feedback")
+        }
+
+        XCTAssertTrue(engine.pasteIntoActiveApp(
+            RichText(plain: "selection"),
+            ifStillValid: { true },
+            onCommit: { [unowned self] in
+                XCTAssertEqual(self.keys.pasteCount, 1)
+                events.append("commit")
+            }
+        ))
+
+        XCTAssertEqual(events, ["commit", "feedback"])
+    }
 }

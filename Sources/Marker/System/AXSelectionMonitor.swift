@@ -7,6 +7,17 @@ import ApplicationServices
 struct FocusedPasteTarget {
     fileprivate let pid: pid_t
     fileprivate let element: AXUIElement
+    fileprivate let role: String?
+    fileprivate let frame: CGRect?
+    fileprivate let focusGeneration: UInt64
+}
+
+/// AX element underneath a physical click. Retaining its process identity is
+/// essential: a session event tap runs before the click activates another app.
+struct PasteHitTarget {
+    fileprivate let pid: pid_t
+    fileprivate let element: AXUIElement
+    let role: String?
 }
 
 /// Thin AX adapter: subscribes to selection-changed notifications on the
@@ -26,6 +37,7 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
     private var keyMonitor: Any?
     private var pendingElement: AXUIElement?
     private let systemWide = AXUIElementCreateSystemWide()
+    private var focusGeneration: UInt64 = 0
 
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -93,13 +105,20 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
         guard AXUIElementGetPid(focused, &elementPID) == .success,
               elementPID == frontmostPID
         else { return nil }
-        return FocusedPasteTarget(pid: elementPID, element: focused)
+        return FocusedPasteTarget(
+            pid: elementPID,
+            element: focused,
+            role: role(of: focused),
+            frame: frame(of: focused),
+            focusGeneration: focusGeneration
+        )
     }
 
     /// Revalidate process, AX identity, and editable role immediately before
     /// a delayed gesture paste.
     func isStillFocusedEditable(_ target: FocusedPasteTarget) -> Bool {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.pid,
+              focusGeneration == target.focusGeneration,
               let focused = focusedElement(),
               CFEqual(focused, target.element),
               MiddlePastePolicy.shouldPaste(role: role(of: focused))
@@ -109,23 +128,95 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
             && elementPID == target.pid
     }
 
-    func roleAtMouseLocation() -> String? {
-        let location = NSEvent.mouseLocation
-        guard let screenHeight = NSScreen.screens.first?.frame.height else { return nil }
+    func pasteHitTarget(at point: CGPoint) -> PasteHitTarget? {
+        guard let element = element(atScreenLocation: point) else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success, pid > 0 else { return nil }
+        return PasteHitTarget(pid: pid, element: element, role: role(of: element))
+    }
+
+    /// Proves that a click seen before event delivery belongs to the already
+    /// focused editor. This prevents swallowing a click intended to activate
+    /// another app/control and then pasting into the stale focus.
+    func hitTargetsFocusedEditable(
+        _ hit: PasteHitTarget,
+        at point: CGPoint,
+        target: FocusedPasteTarget
+    ) -> Bool {
+        let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let generationMatches = focusGeneration == target.focusGeneration
+        let sameElement = CFEqual(hit.element, target.element)
+        let matches = Self.hitTargetsFocusedEditable(
+            frontmostPID: frontmostPID,
+            hitPID: hit.pid,
+            targetPID: target.pid,
+            focusGenerationMatches: generationMatches,
+            sameAXElement: sameElement,
+            targetRole: target.role,
+            targetFrame: target.frame,
+            point: point
+        )
+        // Use only the metadata already read for the decision: no extra AX
+        // calls inside the event tap and no titles, values, URLs, or geometry.
+        diagLog(
+            "paste.hit_test matched=\(matches) "
+                + "frontmost_pid=\(frontmostPID ?? 0) target_pid=\(target.pid) hit_pid=\(hit.pid) "
+                + "focused_role=\(target.role ?? "nil") cursor_role=\(hit.role ?? "nil") "
+                + "focus_generation_matches=\(generationMatches) same_element=\(sameElement) "
+                + "frame_available=\(target.frame != nil) inside_frame=\(target.frame?.contains(point) ?? false)"
+        )
+        return matches
+    }
+
+    static func hitTargetsFocusedEditable(
+        frontmostPID: pid_t?,
+        hitPID: pid_t,
+        targetPID: pid_t,
+        focusGenerationMatches: Bool,
+        sameAXElement: Bool,
+        targetRole: String?,
+        targetFrame: CGRect?,
+        point: CGPoint
+    ) -> Bool {
+        guard frontmostPID == targetPID,
+              hitPID == targetPID,
+              focusGenerationMatches,
+              MiddlePastePolicy.shouldPaste(role: targetRole)
+        else { return false }
+        if sameAXElement { return true }
+        guard let targetFrame else { return false }
+        return targetFrame.contains(point)
+    }
+
+    func isScreenPointInsideFocusedEditableTarget(
+        _ point: CGPoint,
+        target: FocusedPasteTarget
+    ) -> Bool {
+        guard MiddlePastePolicy.shouldPaste(role: target.role),
+              let frame = target.frame
+        else { return false }
+        return frame.contains(point)
+    }
+
+    func role(atScreenLocation point: CGPoint) -> String? {
+        guard let element = element(atScreenLocation: point) else { return nil }
+        return role(of: element)
+    }
+
+    private func element(atScreenLocation point: CGPoint) -> AXUIElement? {
         var elementRef: AXUIElement?
         guard AXUIElementCopyElementAtPosition(
             systemWide,
-            Float(location.x),
-            Float(screenHeight - location.y),
+            Float(point.x),
+            Float(point.y),
             &elementRef
-        ) == .success, let elementRef else { return nil }
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            elementRef,
-            kAXRoleAttribute as CFString,
-            &roleRef
         ) == .success else { return nil }
-        return roleRef as? String
+        return elementRef
+    }
+
+    func roleAtMouseLocation() -> String? {
+        guard let point = CGEvent(source: nil)?.location else { return nil }
+        return role(atScreenLocation: point)
     }
 
     // MARK: - AX observer wiring
@@ -136,6 +227,7 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
     }
 
     private func detach() {
+        focusGeneration &+= 1
         if let observer {
             CFRunLoopRemoveSource(
                 CFRunLoopGetMain(),
@@ -164,6 +256,7 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
             guard let refcon else { return }
             let monitor = Unmanaged<AXSelectionMonitor>.fromOpaque(refcon).takeUnretainedValue()
             if notification as String == kAXFocusedUIElementChangedNotification as String {
+                monitor.focusGeneration &+= 1
                 monitor.pendingElement = nil
                 monitor.onFocusedElementChanged?()
                 return
@@ -463,5 +556,36 @@ final class AXSelectionMonitor: NSObject, SelectionReading {
             &roleRef
         ) == .success else { return nil }
         return roleRef as? String
+    }
+    private func frame(of element: AXUIElement) -> CGRect? {
+        var positionRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXPositionAttribute as CFString,
+            &positionRef
+        ) == .success,
+              AXUIElementCopyAttributeValue(
+                element,
+                kAXSizeAttribute as CFString,
+                &sizeRef
+              ) == .success,
+              let positionRef,
+              let sizeRef,
+              CFGetTypeID(positionRef) == AXValueGetTypeID(),
+              CFGetTypeID(sizeRef) == AXValueGetTypeID()
+        else { return nil }
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(positionRef as! AXValue, .cgPoint, &position),
+              AXValueGetValue(sizeRef as! AXValue, .cgSize, &size),
+              position.x.isFinite,
+              position.y.isFinite,
+              size.width.isFinite,
+              size.height.isFinite,
+              size.width > 0,
+              size.height > 0
+        else { return nil }
+        return CGRect(origin: position, size: size)
     }
 }

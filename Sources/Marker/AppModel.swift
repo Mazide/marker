@@ -281,7 +281,7 @@ final class AppModel {
                 HistoryPanelPresenter.shared.toggle()
             }
         }
-        middleClickTap.onMiddleClick = { [weak self] _ in
+        middleClickTap.onMiddleClick = { [weak self] point in
             guard let self else { return false }
             let operation = self.recordPasteRequest(trigger: "middle_click")
             guard self.middleClickPasteEnabled, self.axTrusted else {
@@ -289,18 +289,48 @@ final class AppModel {
                 diagLog("paste.resolved operation=\(operation) outcome=rejected reason=\(reason)")
                 return false
             }
-            guard self.shouldPasteAtCursor(input: "middle-click") else {
+            guard let target = self.axMonitor.focusedEditablePasteTarget() else {
+                diagLog("paste.resolved operation=\(operation) outcome=rejected reason=no_focused_editor")
+                return false
+            }
+            guard let hit = self.axMonitor.pasteHitTarget(at: point) else {
+                diagLog("paste.resolved operation=\(operation) outcome=rejected reason=target_under_cursor_unavailable")
+                return false
+            }
+            guard self.axMonitor.hitTargetsFocusedEditable(hit, at: point, target: target) else {
+                diagLog("paste.resolved operation=\(operation) outcome=rejected reason=cursor_outside_focused_editor")
+                return false
+            }
+            guard self.shouldPasteAtCursor(
+                input: "middle-click",
+                hit: hit,
+                point: point,
+                focusedTarget: target
+            ) else {
                 diagLog("paste.resolved operation=\(operation) outcome=rejected reason=cursor_role_not_editable")
                 return false
             }
-            guard let item = self.itemToPaste() else {
+            guard let choice = self.choiceToPaste() else {
                 diagLog("paste.resolved operation=\(operation) outcome=rejected reason=nothing_to_paste")
                 return false
             }
             // Paste into the current focus, same as ⌥V.
-            self.pendingPasteFeedbackAnchor = NSEvent.mouseLocation
-            self.pasteEngine.pasteIntoActiveApp(item.content, operationID: operation)
-            return true
+            let anchor = NSEvent.mouseLocation
+            return self.pasteEngine.pasteIntoActiveApp(
+                choice.item.content,
+                operationID: operation,
+                ifStillValid: { [weak self] in
+                    guard let self else { return false }
+                    return self.middleClickPasteEnabled && self.axTrusted
+                        && self.axMonitor.isStillFocusedEditable(target)
+                },
+                onCommit: { [weak self] in
+                    self?.pendingPasteFeedbackAnchor = anchor
+                    if let retracting = choice.retracting {
+                        self?.history.delete(retracting)
+                    }
+                }
+            )
         }
         threeFingerClickTap.fingersTouching = { [weak self] in
             self?.trackpadTap.fingersTouching() ?? 0
@@ -557,13 +587,23 @@ final class AppModel {
     /// wanted capture — the paste wipes it from the screen, so retract it
     /// from history too.
     private func itemToPaste() -> SelectionItem? {
+        guard let choice = choiceToPaste() else { return nil }
+        if let retracting = choice.retracting {
+            history.delete(retracting)
+            markerLog.info("retracted select-to-replace capture from history")
+        }
+        return choice.item
+    }
+
+    /// A cancellable paste must not retract history before command dispatch.
+    private func choiceToPaste() -> (item: SelectionItem, retracting: SelectionItem?)? {
         history.refresh() // marker-cli may have added entries behind our back
         let items = history.items
         // A popover pick wins outright — the user pointed at this exact
         // entry, so the never-paste-onto-itself policy doesn't apply.
         if let id = pickedPasteItemID {
             if let picked = items.first(where: { $0.id == id }) {
-                return picked
+                return (picked, nil)
             }
             pickedPasteItemID = nil // deleted since; fall back to the newest
         }
@@ -571,22 +611,31 @@ final class AppModel {
             history: items,
             currentSelection: axMonitor.currentSelection()
         )
-        if let picked, let first = items.first, picked.id != first.id {
-            history.delete(first)
-            markerLog.info("retracted select-to-replace capture from history")
-        }
-        return picked
+        guard let picked else { return nil }
+        let retracting = items.first.flatMap { $0.id != picked.id ? $0 : nil }
+        return (picked, retracting)
     }
 
     /// Shared gate for the cursor-targeted paste triggers. Clicks pass
     /// through when the policy says no, so the cursor role decides first
     /// and the focused element is only a fallback.
-    private func shouldPasteAtCursor(input: String) -> Bool {
-        let cursorRole = axMonitor.roleAtMouseLocation()
+    private func shouldPasteAtCursor(
+        input: String,
+        hit: PasteHitTarget? = nil,
+        point: CGPoint? = nil,
+        focusedTarget: FocusedPasteTarget? = nil
+    ) -> Bool {
+        let cursorRole = hit.map { $0.role } ?? axMonitor.roleAtMouseLocation()
+        let insideEditor = point.flatMap { point in
+            focusedTarget.map {
+                axMonitor.isScreenPointInsideFocusedEditableTarget(point, target: $0)
+            }
+        } ?? false
         var focusedRole: String?
         var usedFocusedRole = false
         let accepted = MiddlePastePolicy.shouldPaste(
             cursorRole: cursorRole,
+            cursorInsideFocusedEditable: insideEditor,
             focusedRole: {
                 usedFocusedRole = true
                 focusedRole = self.axMonitor.focusedElementRole()

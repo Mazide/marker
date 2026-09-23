@@ -122,6 +122,11 @@ confirmed insertion. If recording was off during the failure, export still
 includes current state but cannot reconstruct the missing events. Live logs are
 stored at `~/Library/Logs/Marker.log` and `~/Library/Logs/Marker.previous.log`.
 
+Middle-click accepts ambiguous accessibility elements inside the already focused
+editor, provided the hit belongs to the same foreground app. Links, buttons, tabs,
+and menu items keep their own click behavior. Clicks outside that editor pass
+through; a focus change while waiting for modifiers cancels the pending paste.
+
 ### Other limitations
 
 - Apps with poor Accessibility support (some Electron apps, some Java

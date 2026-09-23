@@ -53,6 +53,29 @@ final class MiddlePastePolicyTests: XCTestCase {
             cursorRole: "AXTab", focusedRole: { "AXTextField" }))
     }
 
+    func testAmbiguousGroupInsideFocusedEditorPastesOnFirstClick() {
+        XCTAssertTrue(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXGroup",
+            cursorInsideFocusedEditable: true,
+            focusedRole: { "AXTextArea" }
+        ))
+        XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+            cursorRole: "AXGroup",
+            cursorInsideFocusedEditable: false,
+            focusedRole: { "AXTextArea" }
+        ))
+    }
+
+    func testSemanticRoleStillWinsInsideFocusedEditor() {
+        for role in ["AXLink", "AXButton", "AXTab", "AXMenuItem"] {
+            XCTAssertFalse(MiddlePastePolicy.shouldPaste(
+                cursorRole: role,
+                cursorInsideFocusedEditable: true,
+                focusedRole: { "AXTextArea" }
+            ), "\(role) must keep its own click behavior even inside editor bounds")
+        }
+    }
+
     func testCursorRoleWinsWithoutTouchingFocus() {
         XCTAssertTrue(MiddlePastePolicy.shouldPaste(
             cursorRole: "AXTextField",
